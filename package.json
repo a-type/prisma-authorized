@@ -1,0 +1,28 @@
+{
+  "name": "graphql-authorization",
+  "version": "0.1.0",
+  "description": "��#\u0000 \u0000g\u0000r\u0000a\u0000p\u0000h\u0000q\u0000l\u0000-\u0000a\u0000u\u0000t\u0000h\u0000o\u0000r\u0000i\u0000z\u0000a\u0000t\u0000i\u0000o\u0000n\u0000\r\u0000 \u0000",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a-type/graphql-authorization.git"
+  },
+  "keywords": [
+    "graphql",
+    "authorization"
+  ],
+  "author": "Grant Forrest <gaforres@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/a-type/graphql-authorization/issues"
+  },
+  "homepage": "https://github.com/a-type/graphql-authorization#readme",
+  "dependencies": {
+    "change-case": "^3.0.1",
+    "graphql-tag": "^2.6.1",
+    "lodash": "^4.17.5"
+  }
+}
