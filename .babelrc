@@ -1,0 +1,12 @@
+{
+  "presets": [
+    ["env", {
+      "modules": "commonjs"
+    }],
+    "flow"
+  ],
+  "plugins": [
+    "transform-object-rest-spread",
+    "transform-runtime"
+  ]
+}

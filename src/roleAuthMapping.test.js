@@ -1,4 +1,4 @@
-const roleAuthMapping = require('./roleAuthMapping');
+import roleAuthMapping from './roleAuthMapping';
 
 describe('user auth mapping', () => {
   const authResolver = jest.fn();
@@ -26,7 +26,7 @@ describe('user auth mapping', () => {
       permissions: {
         thing: {
           bar: {
-            bop: true, 
+            bop: true,
           },
           corge: authResolver,
         },
@@ -39,8 +39,8 @@ describe('user auth mapping', () => {
       thing: {
         foo: true,
         bar: {
-          fizz: true, 
-          bop: true, 
+          fizz: true,
+          bop: true,
         },
         corge: authResolver,
       },

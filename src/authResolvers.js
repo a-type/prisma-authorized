@@ -1,6 +1,13 @@
-const { get } = require('lodash');
+// @flow
+import { get } from 'lodash';
 
-const toFragment = path => {
+type RunFunction = () => {};
+type Context = {
+  user: User,
+  prisma: Prisma,
+};
+
+export const toFragment = (path: string): string => {
   const parts = path.split('.');
   if (parts[0]) {
     if (parts[1]) {
@@ -8,21 +15,31 @@ const toFragment = path => {
     } else {
       return `{ ${parts[0]} }`;
     }
-  } {
+  }
+  {
     return '';
   }
 };
 
-// authResolver: async (queryResult, ctx) => bool
-const isMe = (options = {}) => {
+type IsMeOptions = { userIdPath: string };
+export const isMe = (options: IsMeOptions = { userIdPath: 'id' }) => {
   const { userIdPath = 'id' } = options;
 
-  return { 
-    mutation: (query, run, { user }) => {
+  return {
+    mutation: async (
+      query: {},
+      run: RunFunction,
+      { user }: Context,
+    ): Promise<boolean> => {
       const id = get(query, 'data.' + userIdPath);
-      return Promise.resolve(id === user.id);
+      return id === user.id;
     },
-    query: async (query, run, { user }) => {
+
+    query: async (
+      query: {},
+      run: RunFunction,
+      { user }: Context,
+    ): Promise<boolean> => {
       const resource = await run();
       const id = get(resource, userIdPath);
       return id === user.id;
@@ -30,31 +47,46 @@ const isMe = (options = {}) => {
   };
 };
 
-const isMine = (
-  resourceName, 
-  options = {},
+type IsMineOptions = {
+  relationshipPath: string,
+  resourceIdPath: string,
+};
+export const isMine = (
+  resourceName: string,
+  options: IsMineOptions = {
+    relationshipPath: 'user.id',
+    resourceIdPath: 'id',
+  },
 ) => {
-  const {
-    relationshipPath = 'user.id',
-    resourceIdPath = 'id', 
-  } = options;
-  const mutation = async (query, run, { prisma, user }) => {
+  const { relationshipPath = 'user.id', resourceIdPath = 'id' } = options;
+  const mutation = async (
+    query: {},
+    run: RunFunction,
+    { prisma, user }: Context,
+  ): Promise<boolean> => {
     const id = get(query, 'data.' + resourceIdPath);
     if (!id) {
       throw new Error(
         'In order for this authorization check to work, you must include the id' +
-        ' for the resource in your query. If that is not possible, please opt to use' +
-        ' a custom authorization check for this permission.',
+          ' for the resource in your query. If that is not possible, please opt to use' +
+          ' a custom authorization check for this permission.',
       );
     }
 
     const info = toFragment(relationshipPath);
-    const relationshipResponse = await prisma.query[resourceName]({ where: { id } }, info);
+    const relationshipResponse = await prisma.query[resourceName](
+      { where: { id } },
+      info,
+    );
     return get(relationshipResponse, relationshipPath) === user.id;
   };
 
   return {
-    query: async (query, run, ctx) => {
+    query: async (
+      query: {},
+      run: RunFunction,
+      ctx: Context,
+    ): Promise<boolean> => {
       const resource = await run();
       const userId = get(resource, relationshipPath);
       if (userId) {
@@ -68,7 +100,7 @@ const isMine = (
   };
 };
 
-module.exports = {
+export default {
   toFragment,
   isMe,
   isMine,

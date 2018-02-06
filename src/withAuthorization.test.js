@@ -1,6 +1,6 @@
-const withAuthorization = require('./withAuthorization');
-const { isMe, isMine } = require('./authResolvers');
-const AuthorizationError = require('../errors/AuthorizationError');
+import withAuthorization from './withAuthorization';
+import { isMe, isMine } from './authResolvers';
+import AuthorizationError from '../errors/AuthorizationError';
 
 const ROLES = {
   ANONYMOUS: 'ANONYMOUS',
@@ -75,9 +75,7 @@ describe('withAuthorization', () => {
         thing: jest.fn(),
         otherThing: jest.fn(),
       },
-      mutation: {
-    
-      },
+      mutation: {},
       exists: jest.fn(),
       request: jest.fn(),
     };
@@ -90,14 +88,17 @@ describe('withAuthorization', () => {
         const result = { id: 'userA', name: 'User A' };
         mockPrisma.query.user.mockReturnValueOnce(result);
         expect(
-          await prisma.query.user({ where: { id: 'userA' } }, '{ id, name }')
+          await prisma.query.user({ where: { id: 'userA' } }, '{ id, name }'),
         ).toEqual(result);
       });
       test('cannot read unallowed values', async () => {
         const result = { id: 'userA', name: 'User A', blah: 'foo' };
         mockPrisma.query.user.mockReturnValueOnce(result);
         expect(
-          await prisma.query.user({ where: { id: 'userA' } }, '{ id, name, blah }')
+          await prisma.query.user(
+            { where: { id: 'userA' } },
+            '{ id, name, blah }',
+          ),
         ).toThrow(AuthorizationError);
       });
     });

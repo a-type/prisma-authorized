@@ -1,4 +1,4 @@
-const { toFragment, isMe, isMine } = require('./authResolvers');
+import { toFragment, isMe, isMine } from './authResolvers';
 
 describe('auth resolvers', () => {
   describe('toFragment', () => {
@@ -12,7 +12,7 @@ describe('auth resolvers', () => {
 
   describe('isMe mutation', () => {
     const ctx = { user: { id: 'foo' } };
-    
+
     describe('default config', () => {
       const check = isMe().mutation;
       test('match', () => {
@@ -27,11 +27,15 @@ describe('auth resolvers', () => {
     describe('custom id path', () => {
       const check = isMe({ userIdPath: 'user.connect.where.id' }).mutation;
       test('match', () => {
-        const query = { data: { foo: 'bar', user: { connect: { where: { id: 'foo' } } } } };
+        const query = {
+          data: { foo: 'bar', user: { connect: { where: { id: 'foo' } } } },
+        };
         expect(check(query, null, ctx)).resolves.toBe(true);
       });
       test('no match', () => {
-        const query = { data: { foo: 'bar', user: { connect: { where: { id: 'bar' } } } } };
+        const query = {
+          data: { foo: 'bar', user: { connect: { where: { id: 'bar' } } } },
+        };
         expect(check(query, null, ctx)).resolves.toBe(false);
       });
     });
@@ -44,22 +48,30 @@ describe('auth resolvers', () => {
       const check = isMe().query;
       test('match', () => {
         const result = { id: 'foo' };
-        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(true);
+        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(
+          true,
+        );
       });
       test('no match', () => {
         const result = { id: 'bar' };
-        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(false);
+        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(
+          false,
+        );
       });
     });
     describe('custom id path', () => {
       const check = isMe({ userIdPath: 'user.id' }).query;
       test('match', () => {
         const result = { user: { id: 'foo' } };
-        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(true);
+        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(
+          true,
+        );
       });
       test('no match', () => {
         const result = { user: { id: 'bar' } };
-        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(false);
+        expect(check(null, () => Promise.resolve(result), ctx)).resolves.toBe(
+          false,
+        );
       });
     });
   });
@@ -67,7 +79,7 @@ describe('auth resolvers', () => {
   describe('isMine mutation', () => {
     describe('default config', () => {
       const thingQuery = jest.fn();
-      const ctx = { 
+      const ctx = {
         user: { id: 'foo' },
         prisma: {
           query: {
@@ -78,14 +90,24 @@ describe('auth resolvers', () => {
       const query = { data: { id: 'r' } };
       const check = isMine('thing').mutation;
       test('match', async () => {
-        thingQuery.mockReturnValueOnce(Promise.resolve({ user: { id: 'foo' } }));
+        thingQuery.mockReturnValueOnce(
+          Promise.resolve({ user: { id: 'foo' } }),
+        );
         expect(await check(query, null, ctx)).toBe(true);
-        expect(thingQuery).toHaveBeenCalledWith({ where: { id: 'r' } }, '{ user: { id } }');
+        expect(thingQuery).toHaveBeenCalledWith(
+          { where: { id: 'r' } },
+          '{ user: { id } }',
+        );
       });
       test('no match', async () => {
-        thingQuery.mockReturnValueOnce(Promise.resolve({ user: { id: 'bar' } }));
+        thingQuery.mockReturnValueOnce(
+          Promise.resolve({ user: { id: 'bar' } }),
+        );
         expect(await check(query, null, ctx)).toBe(false);
-        expect(thingQuery).toHaveBeenCalledWith({ where: { id: 'r' } }, '{ user: { id } }');
+        expect(thingQuery).toHaveBeenCalledWith(
+          { where: { id: 'r' } },
+          '{ user: { id } }',
+        );
       });
     });
     describe('custom config', () => {
@@ -104,14 +126,24 @@ describe('auth resolvers', () => {
         resourceIdPath: 'thing.connect.where.id',
       }).mutation;
       test('match', async () => {
-        thingQuery.mockReturnValueOnce(Promise.resolve({ owner: { id: 'foo' } }));
+        thingQuery.mockReturnValueOnce(
+          Promise.resolve({ owner: { id: 'foo' } }),
+        );
         expect(await check(query, null, ctx)).toBe(true);
-        expect(thingQuery).toHaveBeenCalledWith({ where: { id: 'r' } }, '{ owner: { id } }');
+        expect(thingQuery).toHaveBeenCalledWith(
+          { where: { id: 'r' } },
+          '{ owner: { id } }',
+        );
       });
       test('no match', async () => {
-        thingQuery.mockReturnValueOnce(Promise.resolve({ owner: { id: 'bar' } }));
+        thingQuery.mockReturnValueOnce(
+          Promise.resolve({ owner: { id: 'bar' } }),
+        );
         expect(await check(query, null, ctx)).toBe(false);
-        expect(thingQuery).toHaveBeenCalledWith({ where: { id: 'r' } }, '{ owner: { id } }');
+        expect(thingQuery).toHaveBeenCalledWith(
+          { where: { id: 'r' } },
+          '{ owner: { id } }',
+        );
       });
     });
   });
@@ -120,7 +152,7 @@ describe('auth resolvers', () => {
     describe('default config with relationship in info', () => {
       const thingQuery = jest.fn();
       const query = { data: { id: 'r' } };
-      const ctx = { 
+      const ctx = {
         user: { id: 'foo' },
         prisma: {
           query: {
@@ -143,7 +175,7 @@ describe('auth resolvers', () => {
     describe('default config with no relationship in info', () => {
       const thingQuery = jest.fn();
       const query = { data: { id: 'r1' } };
-      const ctx = { 
+      const ctx = {
         user: { id: 'foo' },
         prisma: {
           query: {
@@ -154,20 +186,30 @@ describe('auth resolvers', () => {
       const check = isMine('thing').query;
       const run = () => Promise.resolve({ id: 'r1' });
       test('match', async () => {
-        thingQuery.mockReturnValueOnce(Promise.resolve({ user: { id: 'foo' } }));
+        thingQuery.mockReturnValueOnce(
+          Promise.resolve({ user: { id: 'foo' } }),
+        );
         expect(await check(query, run, ctx)).toBe(true);
-        expect(thingQuery).toHaveBeenCalledWith({ where: { id: 'r1' } }, '{ user: { id } }');
+        expect(thingQuery).toHaveBeenCalledWith(
+          { where: { id: 'r1' } },
+          '{ user: { id } }',
+        );
       });
       test('no match', async () => {
-        thingQuery.mockReturnValueOnce(Promise.resolve({ user: { id: 'bar' } }));
+        thingQuery.mockReturnValueOnce(
+          Promise.resolve({ user: { id: 'bar' } }),
+        );
         expect(await check(query, run, ctx)).toBe(false);
-        expect(thingQuery).toHaveBeenCalledWith({ where: { id: 'r1' } }, '{ user: { id } }');
+        expect(thingQuery).toHaveBeenCalledWith(
+          { where: { id: 'r1' } },
+          '{ user: { id } }',
+        );
       });
     });
     describe('custom config', () => {
       const thingQuery = jest.fn();
       const query = { data: { id: 'r' } };
-      const ctx = { 
+      const ctx = {
         user: { id: 'foo' },
         prisma: {
           query: {
@@ -180,12 +222,14 @@ describe('auth resolvers', () => {
         resourceIdPath: 'thing.id',
       }).query;
       test('match', async () => {
-        const run = () => Promise.resolve({ thing: { id: 'r', user: { id: 'foo' } } });
+        const run = () =>
+          Promise.resolve({ thing: { id: 'r', user: { id: 'foo' } } });
         expect(await check(query, run, ctx)).toBe(true);
         expect(thingQuery).toHaveBeenCalledTimes(0);
       });
       test('no match', async () => {
-        const run = () => Promise.resolve({ thing: { id: 'r', user: { id: 'bar' } } });
+        const run = () =>
+          Promise.resolve({ thing: { id: 'r', user: { id: 'bar' } } });
         expect(await check(query, run, ctx)).toBe(false);
         expect(thingQuery).toHaveBeenCalledTimes(0);
       });

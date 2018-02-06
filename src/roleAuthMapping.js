@@ -1,10 +1,10 @@
-const { defaultsDeep } = require('lodash');
+import { defaultsDeep } from 'lodash';
 
-const userAuthMapping = (authMapping, role) => {
+const rolesAuthMapping = (authMapping, role) => {
   if (!role) {
     return {};
   }
-  
+
   const queue = [];
   let currentAuth = authMapping[role];
   while (currentAuth) {
@@ -14,4 +14,4 @@ const userAuthMapping = (authMapping, role) => {
   return defaultsDeep(...queue);
 };
 
-module.exports = userAuthMapping;
+export default rolesAuthMapping;
