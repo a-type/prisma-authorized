@@ -2,6 +2,32 @@ import withAuthorization from './withAuthorization';
 import { isMe, isMine } from './authResolvers';
 import AuthorizationError from './errors/AuthorizationError';
 
+const typeDefs = `
+type User {
+  id: String!
+  name: String!
+}
+
+type Thing {
+  id: String!
+  foo: Int!
+  user: User!
+  otherThing: OtherThing
+}
+
+type OtherThing {
+  id: String!
+  baz: String!
+  user: User!
+}
+
+type query {
+  user(where: UserUniqueInput): User!
+  thing(where: ThingUniqueInput): Thing!
+  otherThing(where: OtherThingUniqueInput): OtherThing!
+}
+`;
+
 const ROLES = {
   ANONYMOUS: 'ANONYMOUS',
   USER: 'USER',
@@ -10,28 +36,25 @@ const ROLES = {
 const authMappings = {
   [ROLES.ANONYMOUS]: {
     permissions: {
-      user: {
+      User: {
         read: {
           id: true,
           name: true,
-          where: 'user',
         },
       },
-      thing: {
+      Thing: {
         read: {
           id: true,
           foo: true,
-          user: 'user',
-          otherThing: 'otherThing',
-          where: 'thing',
+          user: 'User',
+          otherThing: 'OtherThing',
         },
       },
-      otherThing: {
+      OtherThing: {
         read: {
           id: true,
           baz: true,
-          user: 'user',
-          where: 'otherThing',
+          user: 'User',
         },
       },
     },
@@ -39,18 +62,18 @@ const authMappings = {
   [ROLES.USER]: {
     inherits: ROLES.ANONYMOUS,
     permissions: {
-      user: {
+      User: {
         read: {
           email: isMe().query,
         },
       },
-      thing: {
+      Thing: {
         read: {
           foo: true,
           bar: isMine('thing').query,
         },
       },
-      otherThing: {
+      OtherThing: {
         read: {
           baz: true,
           corge: isMine('otherThing').query,
@@ -79,7 +102,7 @@ describe('withAuthorization', () => {
       exists: jest.fn(),
       request: jest.fn(),
     };
-    prisma = withAuthorization(mockPrisma, authMappings)(user);
+    prisma = withAuthorization(authMappings, typeDefs)(user);
   });
 
   describe('simple (bool) mappings', () => {

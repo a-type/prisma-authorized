@@ -1,5 +1,5 @@
 //@flow
-import typeof { GraphQLSchema } from 'graphql';
+import type { DocumentNode } from 'graphql';
 import { camel } from 'change-case';
 import { get, mapValues, isPlainObject, isBoolean, isString } from 'lodash';
 import roleAuthMapping from './roleAuthMapping';
@@ -27,34 +27,48 @@ const summarizeAuthResult = (authResult: AuthResult) => {
   return traverse(authResult, true);
 };
 
+const getInputTypesForQuery = (typeDefs, queryFieldName) => {};
+
+const getResponseTypeForQuery = (typeDefs, queryFieldName) => {};
+
 type WithAuthorizationOptions = {};
+type QueryFunction = (variables: {}, info: string) => Promise<{}>;
 export default (
   rootAuthMapping: AuthMapping,
-  schema: GraphQLSchema,
+  typeDefs: DocumentNode | string,
   options: WithAuthorizationOptions,
 ) => (user: User) => {
   const authMapping = roleAuthMapping(rootAuthMapping, user.role);
   console.log(`authMapping ${JSON.stringify(authMapping)}`);
+  const resolvedTypeDefs = isString(typeDefs)
+    ? gql`
+        ${typeDefs}
+      `
+    : typeDefs;
 
-  const wrapQuery = (queryFunction, isRead, queryName) => {
-    const queryType = isRead ? 'get' : getQueryType(queryName);
+  const wrapQuery = (
+    queryFunction: QueryFunction,
+    rootType: 'query' | 'mutation',
+    queryName,
+  ) => {
+    const isRead = rootType === 'query';
     const resourceName = camel(queryName.replace(queryType, ''));
     console.log(`processing for ${queryType} on ${resourceName}`);
 
-    const wrappedQuery = async (variables: {}, info: string, ctx: {}) => {
+    const wrappedQuery = async (inputs: {}, info: string, ctx: {}) => {
       /**
-       * PHASE 1: Validate variables against `write` rules
+       * PHASE 1: Validate inputs against `write` rules
        * (mutations only)
        */
-      const validateVariables = async (vars: {}): Promise<AuthResult> => {};
+      const validateInputs = async (vars: {}): Promise<AuthResult> => {};
 
-      const variableValidationResult = await validateVariables(variables);
-      const areVariablesValid = summarizeAuthResult(variableValidationResult);
+      const variableValidationResult = await validateInputs(inputs);
+      const areInputsValid = summarizeAuthResult(variableValidationResult);
 
       /**
        * PHASE 2: Run query and get result
        */
-      const queryResponse = await queryFunction();
+      const queryResponse = await queryFunction(inputs, info);
 
       /**
        * PHASE 3: Validate response against `read` rules

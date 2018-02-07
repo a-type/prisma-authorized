@@ -46,7 +46,7 @@ type IsMineOptions = {
   resourceIdPath: string,
 };
 export const isMine = (
-  resourceName: string,
+  getFieldName: string,
   options: IsMineOptions = {
     relationshipPath: 'user.id',
     resourceIdPath: 'id',
@@ -68,7 +68,7 @@ export const isMine = (
     }
 
     const info = toFragment(relationshipPath);
-    const relationshipResponse = await prisma.query[resourceName](
+    const relationshipResponse = await prisma.query[getFieldName](
       { where: { id } },
       info,
     );
