@@ -1,12 +1,14 @@
+//@flow
+import typeof { GraphQLSchema } from 'graphql';
 import { camel } from 'change-case';
 import { get, mapValues, isPlainObject, isBoolean, isString } from 'lodash';
 import roleAuthMapping from './roleAuthMapping';
-import AuthorizationError from '../errors/AuthorizationError';
+import AuthorizationError from './errors/AuthorizationError';
 import gql from 'graphql-tag';
 
 const matchQueryType = /(create|update|upsert|delete|updateMany|deleteMany)/;
 
-const getQueryType = queryName => {
+const getQueryType = (queryName: string) => {
   const queryTypeMatch = matchQueryType.exec(queryName);
   if (queryTypeMatch && queryTypeMatch[1]) {
     return queryTypeMatch[1];
@@ -14,7 +16,8 @@ const getQueryType = queryName => {
   throw new Error(`Unknown query type for query named ${queryName}`);
 };
 
-const summarizeAuthResult = authResult => {
+type AuthResult = { [string]: AuthResult | boolean };
+const summarizeAuthResult = (authResult: AuthResult) => {
   const traverse = (sum, level) => {
     if (isBoolean(level)) {
       return sum && level;
@@ -24,7 +27,12 @@ const summarizeAuthResult = authResult => {
   return traverse(authResult, true);
 };
 
-export default (prisma, rootAuthMapping) => user => {
+type WithAuthorizationOptions = {};
+export default (
+  rootAuthMapping: AuthMapping,
+  schema: GraphQLSchema,
+  options: WithAuthorizationOptions,
+) => (user: User) => {
   const authMapping = roleAuthMapping(rootAuthMapping, user.role);
   console.log(`authMapping ${JSON.stringify(authMapping)}`);
 
@@ -33,6 +41,32 @@ export default (prisma, rootAuthMapping) => user => {
     const resourceName = camel(queryName.replace(queryType, ''));
     console.log(`processing for ${queryType} on ${resourceName}`);
 
+    const wrappedQuery = async (variables: {}, info: string, ctx: {}) => {
+      /**
+       * PHASE 1: Validate variables against `write` rules
+       * (mutations only)
+       */
+      const validateVariables = async (vars: {}): Promise<AuthResult> => {};
+
+      const variableValidationResult = await validateVariables(variables);
+      const areVariablesValid = summarizeAuthResult(variableValidationResult);
+
+      /**
+       * PHASE 2: Run query and get result
+       */
+      const queryResponse = await queryFunction();
+
+      /**
+       * PHASE 3: Validate response against `read` rules
+       * (mutations and queries)
+       */
+      const validateResponse = async (response: {}): Promise<AuthResult> => {};
+
+      const responseValidationResult = await validateResponse(queryResponse);
+      const isResponseValid = summarizeAuthResult(responseValidationResult);
+    };
+
+    /*
     const getAuthResolver = queryPath =>
       get(authMapping, `${resourceName}.${queryType}.${queryPath}`, false);
 
@@ -61,9 +95,9 @@ export default (prisma, rootAuthMapping) => user => {
         }
       };
 
-      const processLevel = (args, levelKey) => {
+      const processLevel = (args: any, levelKey?: string) => {
         console.log(
-          `processing level ${levelKey}, args ${JSON.stringify(args)}`,
+          `processing level ${levelKey || 'root'}, args ${JSON.stringify(args)}`,
         );
         return mapValues(args, (value, key) => {
           const absKey = levelKey ? `${levelKey}.${key}` : key;
@@ -117,6 +151,7 @@ export default (prisma, rootAuthMapping) => user => {
     };
 
     return wrapped.bind(prisma);
+    */
   };
 
   const query = mapValues(prisma.query, (fn, key) =>

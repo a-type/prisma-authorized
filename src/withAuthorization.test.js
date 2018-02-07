@@ -1,6 +1,6 @@
 import withAuthorization from './withAuthorization';
 import { isMe, isMine } from './authResolvers';
-import AuthorizationError from '../errors/AuthorizationError';
+import AuthorizationError from './errors/AuthorizationError';
 
 const ROLES = {
   ANONYMOUS: 'ANONYMOUS',
@@ -40,18 +40,18 @@ const authMappings = {
     inherits: ROLES.ANONYMOUS,
     permissions: {
       user: {
-        get: {
+        read: {
           email: isMe().query,
         },
       },
       thing: {
-        get: {
+        read: {
           foo: true,
           bar: isMine('thing').query,
         },
       },
       otherThing: {
-        get: {
+        read: {
           baz: true,
           corge: isMine('otherThing').query,
         },
@@ -94,12 +94,12 @@ describe('withAuthorization', () => {
       test('cannot read unallowed values', async () => {
         const result = { id: 'userA', name: 'User A', blah: 'foo' };
         mockPrisma.query.user.mockReturnValueOnce(result);
-        expect(
+        expect(async () => {
           await prisma.query.user(
             { where: { id: 'userA' } },
             '{ id, name, blah }',
-          ),
-        ).toThrow(AuthorizationError);
+          );
+        }).toThrow(AuthorizationError);
       });
     });
   });

@@ -1,12 +1,6 @@
 // @flow
 import { get } from 'lodash';
 
-type RunFunction = () => {};
-type Context = {
-  user: User,
-  prisma: Prisma,
-};
-
 export const toFragment = (path: string): string => {
   const parts = path.split('.');
   if (parts[0]) {
