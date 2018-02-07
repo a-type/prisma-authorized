@@ -102,7 +102,7 @@ describe('withAuthorization', () => {
       exists: jest.fn(),
       request: jest.fn(),
     };
-    prisma = withAuthorization(authMappings, typeDefs)(user);
+    prisma = withAuthorization(authMappings, typeDefs, mockPrisma)(user);
   });
 
   describe('simple (bool) mappings', () => {
@@ -117,12 +117,9 @@ describe('withAuthorization', () => {
       test('cannot read unallowed values', async () => {
         const result = { id: 'userA', name: 'User A', blah: 'foo' };
         mockPrisma.query.user.mockReturnValueOnce(result);
-        expect(async () => {
-          await prisma.query.user(
-            { where: { id: 'userA' } },
-            '{ id, name, blah }',
-          );
-        }).toThrow(AuthorizationError);
+        expect(
+          prisma.query.user({ where: { id: 'userA' } }, '{ id, name, blah }'),
+        ).rejects.toThrow(AuthorizationError);
       });
     });
   });

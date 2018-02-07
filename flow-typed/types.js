@@ -13,12 +13,16 @@ type Context = {
 type Prisma = {
   query: {},
   mutation: {},
+  exists: () => mixed,
+  request: () => mixed,
 };
 
+type AuthResolverFunction = (args: {}, ctx: Context) => Promise<boolean>;
 type AuthResolver =
   | boolean
   | string
-  | ((args, RunFunction, Context) => Promise<boolean>);
+  | AuthResolverFunction
+  | { [string]: AuthResolver };
 
 type AuthResource = {
   read: { [string]: AuthResolver },
@@ -35,3 +39,6 @@ type RoleAuthMapping = {
 type AuthMapping = {
   [string]: RoleAuthMapping,
 };
+
+type QueryResponse = Promise<{}>;
+type QueryFunction = (inputs: {}, info: string) => QueryResponse;

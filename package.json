@@ -30,6 +30,9 @@
     "url": "https://github.com/a-type/graphql-authorization/issues"
   },
   "homepage": "https://github.com/a-type/graphql-authorization#readme",
+  "jest": {
+    "roots": ["src"]
+  },
   "dependencies": {
     "change-case": "^3.0.1",
     "graphql-tag": "^2.6.1",

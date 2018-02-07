@@ -1,69 +1,228 @@
 //@flow
-import type { DocumentNode } from 'graphql';
+import type {
+  DocumentNode,
+  FieldDefinitionNode,
+  TypeNode,
+  InputValueDefinitionNode,
+} from 'graphql';
 import { camel } from 'change-case';
-import { get, mapValues, isPlainObject, isBoolean, isString } from 'lodash';
+import {
+  get,
+  mapValues,
+  isPlainObject,
+  isBoolean,
+  isString,
+  isFunction,
+} from 'lodash';
 import roleAuthMapping from './roleAuthMapping';
 import AuthorizationError from './errors/AuthorizationError';
 import gql from 'graphql-tag';
+import { mapPromiseValues } from './utils';
 
-const matchQueryType = /(create|update|upsert|delete|updateMany|deleteMany)/;
+const joinPropertyPaths = (...paths: Array<?string>): string =>
+  paths.filter(Boolean).join('.');
 
-const getQueryType = (queryName: string) => {
-  const queryTypeMatch = matchQueryType.exec(queryName);
-  if (queryTypeMatch && queryTypeMatch[1]) {
-    return queryTypeMatch[1];
-  }
-  throw new Error(`Unknown query type for query named ${queryName}`);
-};
+type AuthResult = { [string]: AuthResult } | boolean;
 
-type AuthResult = { [string]: AuthResult | boolean };
 const summarizeAuthResult = (authResult: AuthResult) => {
+  console.info(`summarizing: ${JSON.stringify(authResult)}`);
   const traverse = (sum, level) => {
+    console.info(`level ${level}: ${sum}`);
     if (isBoolean(level)) {
       return sum && level;
     }
     return Object.values(level).reduce(traverse, sum);
   };
-  return traverse(authResult, true);
+  return traverse(true, authResult);
 };
 
-const getInputTypesForQuery = (typeDefs, queryFieldName) => {};
+// TODO: memoize
+const getQueryField = (
+  typeDefs: DocumentNode,
+  rootField: string,
+  queryFieldName: string,
+): FieldDefinitionNode => {
+  const root = get(typeDefs, 'definitions', []).find(
+    def => def.name.value === rootField,
+  );
+  return get(root, 'fields', []).find(
+    field => field.name.value === queryFieldName,
+  );
+};
 
-const getResponseTypeForQuery = (typeDefs, queryFieldName) => {};
+const getTypeName = (typeNode: TypeNode): string => {
+  switch (typeNode.kind) {
+    case 'NamedType':
+      return typeNode.name.value;
+    case 'ListType':
+      return getTypeName(typeNode.type);
+    case 'NonNullType':
+      return getTypeName(typeNode.type);
+    default:
+      return 'Unknown';
+  }
+};
+
+const getInputTypesForQuery = (
+  typeDefs: DocumentNode,
+  rootField: string,
+  queryFieldName: string,
+): { [string]: string } => {
+  const field = getQueryField(typeDefs, rootField, queryFieldName);
+  return (field.arguments || []).reduce(
+    (map: { [string]: string }, arg: InputValueDefinitionNode) => {
+      const inputName = arg.name.value;
+      const typeName = getTypeName(arg.type);
+      return {
+        ...map,
+        [inputName]: typeName,
+      };
+    },
+    {},
+  );
+};
+
+const getResponseTypeForQuery = (
+  typeDefs: DocumentNode,
+  rootField: string,
+  queryFieldName: string,
+): string => {
+  const field = getQueryField(typeDefs, rootField, queryFieldName);
+  return getTypeName(field.type);
+};
+
+const createAuthError = (result: AuthResult): AuthorizationError => {
+  return new AuthorizationError(
+    `Detailed access result: ${JSON.stringify(result)}`,
+  );
+};
 
 type WithAuthorizationOptions = {};
-type QueryFunction = (variables: {}, info: string) => Promise<{}>;
+type AuthType = 'read' | 'write';
+type WrappedQueryFunction = (
+  inputs: {},
+  info: string,
+  ctx: {},
+) => QueryResponse;
+
 export default (
   rootAuthMapping: AuthMapping,
   typeDefs: DocumentNode | string,
+  prisma: Prisma,
   options: WithAuthorizationOptions,
 ) => (user: User) => {
   const authMapping = roleAuthMapping(rootAuthMapping, user.role);
   console.log(`authMapping ${JSON.stringify(authMapping)}`);
-  const resolvedTypeDefs = isString(typeDefs)
+  const resolvedTypeDefs: DocumentNode = isString(typeDefs)
     ? gql`
         ${typeDefs}
       `
     : typeDefs;
 
+  const getAuthResolver = (
+    authType: AuthType,
+    typeName: string,
+    path?: string,
+  ): AuthResolver =>
+    get(authMapping, joinPropertyPaths(typeName, authType, path), false);
+
   const wrapQuery = (
     queryFunction: QueryFunction,
     rootType: 'query' | 'mutation',
     queryName,
-  ) => {
+  ): WrappedQueryFunction => {
+    console.info(`processing ${rootType}.${queryName}`);
     const isRead = rootType === 'query';
-    const resourceName = camel(queryName.replace(queryType, ''));
-    console.log(`processing for ${queryType} on ${resourceName}`);
 
-    const wrappedQuery = async (inputs: {}, info: string, ctx: {}) => {
+    return async (inputs: {}, info: string, ctx: {}) => {
+      const authContext = {
+        user,
+        graphqlContext: ctx,
+      };
+
+      const authorizeType = async (
+        authType: AuthType,
+        typeName: string,
+        data: {},
+      ): Promise<AuthResult> => {
+        const authorizeLevel = async (
+          levelData: any,
+          path?: string,
+        ): Promise<AuthResult> => {
+          console.info(
+            `auth level ${path || 'root'}, ${JSON.stringify(levelData)}`,
+          );
+          const resolver = getAuthResolver(authType, typeName, path);
+          console.info(`resolver is: ${JSON.stringify(resolver)}`);
+
+          if (isPlainObject(resolver)) {
+            // object resolver: traverse the next level of data
+            // and apply child resolvers
+            return mapPromiseValues(
+              mapValues(levelData, (subData, key) => {
+                const subPath = joinPropertyPaths(path, key);
+                return authorizeLevel(subData, subPath);
+              }),
+            );
+          } else if (isBoolean(resolver)) {
+            // boolean resolver: return raw value
+            return resolver;
+          } else if (isString(resolver)) {
+            // string resolver: authorize all sub-data as the type specified
+            // in the string
+            return await authorizeType(authType, resolver, levelData);
+          } else if (isFunction(resolver)) {
+            // function resolver: call function and return result
+            return await resolver(data, authContext);
+          } else {
+            // unknown resolver type, default false.
+            console.warn(
+              `Unknown resolver type: ${typeof resolver} (${JSON.stringify(
+                resolver,
+              )}`,
+            );
+            return false;
+          }
+        };
+
+        return authorizeLevel(data);
+      };
+
+      const inputTypes = getInputTypesForQuery(
+        resolvedTypeDefs,
+        rootType,
+        queryName,
+      );
+      console.info(`input types: ${JSON.stringify(inputTypes)}`);
+      const responseType = getResponseTypeForQuery(
+        resolvedTypeDefs,
+        rootType,
+        queryName,
+      );
+      console.info(`response type: ${responseType}`);
+
       /**
        * PHASE 1: Validate inputs against `write` rules
        * (mutations only)
        */
-      const validateInputs = async (vars: {}): Promise<AuthResult> => {};
+      if (!isRead) {
+        const validateInputs = async (): Promise<AuthResult> =>
+          mapPromiseValues(
+            mapValues(inputs, (value, key) =>
+              authorizeType('write', inputTypes[key], value),
+            ),
+          );
 
-      const variableValidationResult = await validateInputs(inputs);
-      const areInputsValid = summarizeAuthResult(variableValidationResult);
+        const inputValidationResult = await validateInputs();
+        console.info(
+          `input validation: ${JSON.stringify(inputValidationResult)}`,
+        );
+        const areInputsValid = summarizeAuthResult(inputValidationResult);
+
+        if (!areInputsValid) {
+          throw createAuthError(inputValidationResult);
+        }
+      }
 
       /**
        * PHASE 2: Run query and get result
@@ -74,105 +233,29 @@ export default (
        * PHASE 3: Validate response against `read` rules
        * (mutations and queries)
        */
-      const validateResponse = async (response: {}): Promise<AuthResult> => {};
+      const validateResponse = async (): Promise<AuthResult> =>
+        authorizeType('read', responseType, queryResponse);
 
-      const responseValidationResult = await validateResponse(queryResponse);
-      const isResponseValid = summarizeAuthResult(responseValidationResult);
-    };
-
-    /*
-    const getAuthResolver = queryPath =>
-      get(authMapping, `${resourceName}.${queryType}.${queryPath}`, false);
-
-    const createSubLevelRunFn = (path, run) => async () => {
-      const result = await run();
-      return get(result, path);
-    };
-
-    const processAuth = (rootArgs, run, info, ctx) => {
-      const processPath = (value, authResolver, absoluteKey) => {
-        console.log(
-          `process path ${absoluteKey}, val ${JSON.stringify(value)}`,
-        );
-        console.log(`authResolver is ${authResolver}`);
-        if (isPlainObject(authResolver)) {
-          return processLevel(value, absoluteKey);
-        } else if (isBoolean(authResolver)) {
-          return authResolver;
-        } else if (isString(authResolver)) {
-          // process auth for other resource: get args at this key
-          const subArgs = get(rootArgs, absoluteKey);
-          const subRun = createSubLevelRunFn(absoluteKey, run);
-          return processAuth(subArgs, subRun, info, ctx);
-        } else {
-          return authResolver(rootArgs, run, ctx);
-        }
-      };
-
-      const processLevel = (args: any, levelKey?: string) => {
-        console.log(
-          `processing level ${levelKey || 'root'}, args ${JSON.stringify(args)}`,
-        );
-        return mapValues(args, (value, key) => {
-          const absKey = levelKey ? `${levelKey}.${key}` : key;
-          console.log(`retrieving authResolver for ${absKey}`);
-          const authResolver = getAuthResolver(absKey);
-          return processPath(value, authResolver, absKey);
-        });
-      };
-
-      const parsedInfo = gql`
-        ${info}
-      `;
-      console.info(parsedInfo);
-
-      return processLevel(rootArgs);
-    };
-
-    const wrapped = async (args, info, ctx) => {
+      const responseValidationResult = await validateResponse();
       console.info(
-        `authorizing ${JSON.stringify(
-          args,
-        )} ${info} for ${queryType} on ${resourceName}`,
+        `response validation: ${JSON.stringify(responseValidationResult)}`,
       );
-      let runResult;
-      const run = async () => {
-        if (!runResult) {
-          runResult = await queryFunction(args, info);
-        }
-        console.info(`run called; returning ${JSON.stringify(runResult)}`);
-        return runResult;
-      };
+      const isResponseValid = summarizeAuthResult(responseValidationResult);
 
-      const authResult = await processAuth(args, run, info, {
-        graphqlContext: ctx,
-        user,
-        prisma,
-      });
-      console.info('Auth result');
-      console.info(authResult);
-      const isAuthorized = summarizeAuthResult(authResult);
-      if (!isAuthorized) {
-        throw new AuthorizationError(
-          `Authorization check failed. Access summary for your query: ${JSON.stringify(
-            authResult,
-            null,
-            ' ',
-          )}`,
-        );
+      if (!isResponseValid) {
+        throw createAuthError(responseValidationResult);
       }
-      return run();
-    };
 
-    return wrapped.bind(prisma);
-    */
+      console.info(`validation passed!`);
+      return queryResponse;
+    };
   };
 
   const query = mapValues(prisma.query, (fn, key) =>
-    wrapQuery(fn.bind(prisma), true, key),
+    wrapQuery(fn.bind(prisma), 'query', key),
   );
   const mutation = mapValues(prisma.mutation, (fn, key) =>
-    wrapQuery(fn.bind(prisma), false, key),
+    wrapQuery(fn.bind(prisma), 'mutation', key),
   );
 
   return {
