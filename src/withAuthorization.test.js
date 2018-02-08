@@ -22,9 +22,33 @@ type OtherThing {
 }
 
 type query {
-  user(where: UserUniqueInput): User!
-  thing(where: ThingUniqueInput): Thing!
-  otherThing(where: OtherThingUniqueInput): OtherThing!
+  user(where: UserWhereInput): User!
+  thing(where: ThingWhereInput): Thing!
+  otherThing(where: OtherThingWhereInput): OtherThing!
+}
+
+type mutation {
+  createUser(data: UserCreateInput): User!
+}
+
+input UserWhereInput {
+  id: String
+}
+
+input ThingWhereInput {
+  id: String
+}
+
+input OtherThingWhereInput {
+  id: String
+}
+
+input UserCreateInput {
+  name: String
+}
+
+input ThingCreateInput {
+  foo: Int
 }
 `;
 

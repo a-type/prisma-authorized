@@ -1,13 +1,13 @@
 type User = {
-  userId: string,
+  id: string,
   role: string,
 };
 
-type RunFunction = () => {};
-
-type Context = {
+type AuthContext = {
   user: User,
   prisma: Prisma,
+  typeName: string,
+  fieldName: string,
 };
 
 type Prisma = {
@@ -17,7 +17,7 @@ type Prisma = {
   request: () => mixed,
 };
 
-type AuthResolverFunction = (args: {}, ctx: Context) => Promise<boolean>;
+type AuthResolverFunction = (data: {}, ctx: AuthContext) => Promise<boolean>;
 type AuthResolver =
   | boolean
   | string

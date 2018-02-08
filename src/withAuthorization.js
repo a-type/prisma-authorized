@@ -135,7 +135,7 @@ export default (
     const isRead = rootType === 'query';
 
     return async (inputs: {}, info: string, ctx: {}) => {
-      const authContext = {
+      const baseAuthContext = {
         user,
         graphqlContext: ctx,
       };
@@ -173,7 +173,11 @@ export default (
             return await authorizeType(authType, resolver, levelData);
           } else if (isFunction(resolver)) {
             // function resolver: call function and return result
-            return await resolver(data, authContext);
+            return await resolver(data, {
+              ...baseAuthContext,
+              typeName,
+              fieldName: (path || 'root').split('.').pop(),
+            });
           } else {
             // unknown resolver type, default false.
             console.warn(

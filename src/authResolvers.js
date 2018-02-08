@@ -1,43 +1,17 @@
 // @flow
 import { get } from 'lodash';
-
-export const toFragment = (path: string): string => {
-  const parts = path.split('.');
-  if (parts[0]) {
-    if (parts[1]) {
-      return `{ ${parts[0]}: ${toFragment(parts[1])} }`;
-    } else {
-      return `{ ${parts[0]} }`;
-    }
-  }
-  {
-    return '';
-  }
-};
+import { camel } from 'change-case';
+import { toFragment } from './utils';
 
 type IsMeOptions = { userIdPath: string };
-export const isMe = (options: IsMeOptions = { userIdPath: 'id' }) => {
+export const isMe = (
+  options: IsMeOptions = { userIdPath: 'id' },
+): AuthResolver => {
   const { userIdPath = 'id' } = options;
 
-  return {
-    mutation: async (
-      query: {},
-      run: RunFunction,
-      { user }: Context,
-    ): Promise<boolean> => {
-      const id = get(query, 'data.' + userIdPath);
-      return id === user.id;
-    },
-
-    query: async (
-      query: {},
-      run: RunFunction,
-      { user }: Context,
-    ): Promise<boolean> => {
-      const resource = await run();
-      const id = get(resource, userIdPath);
-      return id === user.id;
-    },
+  return async (data: {}, ctx: AuthContext): Promise<boolean> => {
+    const id = get(data, userIdPath);
+    return id === ctx.user.id;
   };
 };
 
@@ -51,14 +25,17 @@ export const isMine = (
     relationshipPath: 'user.id',
     resourceIdPath: 'id',
   },
-) => {
+): AuthResolver => {
   const { relationshipPath = 'user.id', resourceIdPath = 'id' } = options;
-  const mutation = async (
-    query: {},
-    run: RunFunction,
-    { prisma, user }: Context,
-  ): Promise<boolean> => {
-    const id = get(query, 'data.' + resourceIdPath);
+
+  return async (data: {}, ctx: AuthContext): Promise<boolean> => {
+    const userId = get(data, relationshipPath);
+    if (userId) {
+      return userId === ctx.user.id;
+    }
+
+    // fallback on query if info did not include relationship path
+    const id = get(data, resourceIdPath);
     if (!id) {
       throw new Error(
         'In order for this authorization check to work, you must include the id' +
@@ -68,29 +45,11 @@ export const isMine = (
     }
 
     const info = toFragment(relationshipPath);
-    const relationshipResponse = await prisma.query[getFieldName](
-      { where: { id } },
-      info,
-    );
-    return get(relationshipResponse, relationshipPath) === user.id;
-  };
-
-  return {
-    query: async (
-      query: {},
-      run: RunFunction,
-      ctx: Context,
-    ): Promise<boolean> => {
-      const resource = await run();
-      const userId = get(resource, relationshipPath);
-      if (userId) {
-        return userId === ctx.user.id;
-      }
-
-      // fallback on mutation if info did not include relationship path
-      return mutation({ data: resource }, run, ctx);
-    },
-    mutation,
+    // this may not be the safest way to determine the get query for
+    // a type, but it does seem to work for now...
+    const getQuery = ctx.prisma.query[camel(ctx.typeName)];
+    const relationshipResponse = await getQuery({ where: { id } }, info);
+    return get(relationshipResponse, relationshipPath) === ctx.user.id;
   };
 };
 
