@@ -8,6 +8,7 @@ type AuthContext = {
   prisma: Prisma,
   typeName: string,
   fieldName: string,
+  dataRoot: {},
 };
 
 type Prisma = {

@@ -1,4 +1,4 @@
-import { defaultsDeep } from 'lodash';
+import { merge } from 'lodash';
 
 const rolesAuthMapping = (authMapping, role) => {
   if (!role) {
@@ -8,10 +8,10 @@ const rolesAuthMapping = (authMapping, role) => {
   const queue = [];
   let currentAuth = authMapping[role];
   while (currentAuth) {
-    queue.push(currentAuth.permissions);
+    queue.unshift(currentAuth.permissions);
     currentAuth = authMapping[currentAuth.inherits];
   }
-  return defaultsDeep(...queue);
+  return merge(...queue);
 };
 
 export default rolesAuthMapping;

@@ -1,48 +1,52 @@
 import roleAuthMapping from './roleAuthMapping';
+import { isMe } from './authResolvers';
 
 describe('user auth mapping', () => {
-  const authResolver = jest.fn();
-  const authMap = {
-    ANONYMOUS: {
+  const authResolver = isMe();
+  const ROLES = {
+    ANONYMOUS: 'ANONYMOUS',
+    USER: 'USER',
+  };
+  const authMappings = {
+    [ROLES.ANONYMOUS]: {
       permissions: {
-        thing: {
-          foo: true,
-          bar: {
-            fizz: true,
+        User: {
+          read: {
+            id: true,
+            name: true,
+            email: false,
           },
+          write: {},
         },
       },
     },
-    FOO: {
-      inherits: 'ANONYMOUS',
+    [ROLES.USER]: {
+      inherits: ROLES.ANONYMOUS,
       permissions: {
-        thing: {
-          bip: true,
-        },
-      },
-    },
-    USER: {
-      inherits: 'ANONYMOUS',
-      permissions: {
-        thing: {
-          bar: {
-            bop: true,
+        User: {
+          read: {
+            email: authResolver,
           },
-          corge: authResolver,
+          write: {
+            name: authResolver,
+          },
         },
       },
     },
   };
 
   test('merges auths for inheriting roles', () => {
-    expect(roleAuthMapping(authMap, 'USER')).toEqual({
-      thing: {
-        foo: true,
-        bar: {
-          fizz: true,
-          bop: true,
+    const result = roleAuthMapping(authMappings, 'USER');
+    expect(result).toEqual({
+      User: {
+        read: {
+          id: true,
+          name: true,
+          email: authResolver,
         },
-        corge: authResolver,
+        write: {
+          name: authResolver,
+        },
       },
     });
   });

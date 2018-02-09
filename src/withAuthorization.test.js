@@ -1,6 +1,7 @@
 import withAuthorization from './withAuthorization';
 import { isMe, isMine } from './authResolvers';
 import AuthorizationError from './errors/AuthorizationError';
+import roleAuthMapping from './roleAuthMapping';
 
 const typeDefs = `
 type User {
@@ -29,6 +30,9 @@ type query {
 
 type mutation {
   createUser(data: UserCreateInput): User!
+  updateUser(where: UserWhereInput, data: UserUpdateInput): User!
+  createThing(data: ThingCreateInput): Thing!
+  createOtherThing(data: OtherThingCreateInput): OtherThing!
 }
 
 input UserWhereInput {
@@ -47,8 +51,16 @@ input UserCreateInput {
   name: String
 }
 
+input UserUpdateInput {
+  name: String
+}
+
 input ThingCreateInput {
   foo: Int
+}
+
+input OtherThingCreateInput {
+  baz: String
 }
 `;
 
@@ -56,6 +68,9 @@ const ROLES = {
   ANONYMOUS: 'ANONYMOUS',
   USER: 'USER',
 };
+
+console.log('isme:');
+console.log(isMe());
 
 const authMappings = {
   [ROLES.ANONYMOUS]: {
@@ -65,6 +80,7 @@ const authMappings = {
           id: true,
           name: true,
         },
+        write: {},
       },
       Thing: {
         read: {
@@ -73,6 +89,7 @@ const authMappings = {
           user: 'User',
           otherThing: 'OtherThing',
         },
+        write: {},
       },
       OtherThing: {
         read: {
@@ -80,6 +97,7 @@ const authMappings = {
           baz: true,
           user: 'User',
         },
+        write: {},
       },
     },
   },
@@ -88,19 +106,35 @@ const authMappings = {
     permissions: {
       User: {
         read: {
-          email: isMe().query,
+          email: isMe(),
+          a: true,
+        },
+        write: {
+          name: isMe(),
         },
       },
+      UserCreateInput: { write: 'User' },
+      UserUpdateInput: { write: 'User' },
+      UserWhereInput: { write: { id: true } },
+
       Thing: {
         read: {
           foo: true,
-          bar: isMine('thing').query,
+          bar: isMine('thing'),
+        },
+        write: {
+          foo: true,
         },
       },
+      ThingCreateInput: { write: 'Thing' },
+
       OtherThing: {
         read: {
           baz: true,
-          corge: isMine('otherThing').query,
+          corge: isMine('otherThing'),
+        },
+        write: {
+          baz: isMine('OtherThing'),
         },
       },
     },
@@ -122,10 +156,16 @@ describe('withAuthorization', () => {
         thing: jest.fn(),
         otherThing: jest.fn(),
       },
-      mutation: {},
+      mutation: {
+        createUser: jest.fn(),
+        updateUser: jest.fn(),
+        createThing: jest.fn(),
+        createOtherThing: jest.fn(),
+      },
       exists: jest.fn(),
       request: jest.fn(),
     };
+    console.log(roleAuthMapping(authMappings, 'USER'));
     prisma = withAuthorization(authMappings, typeDefs, mockPrisma)(user);
   });
 
@@ -143,7 +183,63 @@ describe('withAuthorization', () => {
         mockPrisma.query.user.mockReturnValueOnce(result);
         expect(
           prisma.query.user({ where: { id: 'userA' } }, '{ id, name, blah }'),
-        ).rejects.toThrow(AuthorizationError);
+        ).rejects.toThrow('{"id":true,"name":true,"blah":false}');
+      });
+    });
+
+    describe('mutation (write) operations', () => {
+      test('can write allowed values', async () => {
+        const result = { id: 'thingA', foo: 'a' };
+        const input = { data: { foo: 'a' } };
+        mockPrisma.mutation.createThing.mockReturnValueOnce(result);
+        expect(await prisma.mutation.createThing(input, '{ id, foo }')).toEqual(
+          result,
+        );
+      });
+
+      test('cannot write unallowed values', async () => {
+        const input = { data: { id: 'userB' } };
+        expect(prisma.mutation.createUser(input, '{ id }')).rejects.toThrow(
+          '{"id":false}',
+        );
+      });
+    });
+  });
+
+  describe('function mappings', () => {
+    describe('read operations', () => {
+      test('can read allowed values', async () => {
+        const result = { id: 'userA', name: 'User A', email: 'user@place.com' };
+        mockPrisma.query.user.mockReturnValueOnce(result);
+        expect(
+          await prisma.query.user(
+            { where: { id: 'userA' } },
+            '{ id, name, email }',
+          ),
+        ).toEqual(result);
+      });
+
+      test('cannot read unallowed values', async () => {
+        const result = { id: 'userB', name: 'User B', email: 'user@place.com' };
+        mockPrisma.query.user.mockReturnValueOnce(result);
+        expect(
+          prisma.query.user({ where: { id: 'userB' } }, '{ id, name, email }'),
+        ).rejects.toThrow('"email":false');
+      });
+    });
+
+    describe('write operations', () => {
+      test('can write allowed values', async () => {
+        const result = {
+          id: 'userA',
+          name: 'User AA',
+          email: 'user@place.com',
+        };
+        const input = { data: { name: 'User AA' }, where: { id: 'userA' } };
+        mockPrisma.mutation.updateUser.mockReturnValueOnce(result);
+        expect(
+          await prisma.mutation.updateUser(input, '{ id, name, email }'),
+        ).toEqual(result);
       });
     });
   });

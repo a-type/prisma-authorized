@@ -25,9 +25,7 @@ const joinPropertyPaths = (...paths: Array<?string>): string =>
 type AuthResult = { [string]: AuthResult } | boolean;
 
 const summarizeAuthResult = (authResult: AuthResult) => {
-  console.info(`summarizing: ${JSON.stringify(authResult)}`);
   const traverse = (sum, level) => {
-    console.info(`level ${level}: ${sum}`);
     if (isBoolean(level)) {
       return sum && level;
     }
@@ -124,17 +122,17 @@ export default (
     typeName: string,
     path?: string,
   ): AuthResolver =>
-    get(authMapping, joinPropertyPaths(typeName, authType, path), false);
+    get(authMapping, joinPropertyPaths(typeName, authType, path));
 
   const wrapQuery = (
     queryFunction: QueryFunction,
     rootType: 'query' | 'mutation',
     queryName,
   ): WrappedQueryFunction => {
-    console.info(`processing ${rootType}.${queryName}`);
     const isRead = rootType === 'query';
 
     return async (inputs: {}, info: string, ctx: {}) => {
+      console.info(`running ${queryName}`);
       const baseAuthContext = {
         user,
         graphqlContext: ctx,
@@ -144,6 +142,7 @@ export default (
         authType: AuthType,
         typeName: string,
         data: {},
+        dataRoot: {},
       ): Promise<AuthResult> => {
         const authorizeLevel = async (
           levelData: any,
@@ -153,7 +152,8 @@ export default (
             `auth level ${path || 'root'}, ${JSON.stringify(levelData)}`,
           );
           const resolver = getAuthResolver(authType, typeName, path);
-          console.info(`resolver is: ${JSON.stringify(resolver)}`);
+          console.info(`resolver is:`);
+          console.log(resolver);
 
           if (isPlainObject(resolver)) {
             // object resolver: traverse the next level of data
@@ -161,6 +161,9 @@ export default (
             return mapPromiseValues(
               mapValues(levelData, (subData, key) => {
                 const subPath = joinPropertyPaths(path, key);
+                console.info(
+                  `subPath ${subPath}, subdata ${JSON.stringify(subData)}`,
+                );
                 return authorizeLevel(subData, subPath);
               }),
             );
@@ -170,13 +173,14 @@ export default (
           } else if (isString(resolver)) {
             // string resolver: authorize all sub-data as the type specified
             // in the string
-            return await authorizeType(authType, resolver, levelData);
+            return await authorizeType(authType, resolver, levelData, dataRoot);
           } else if (isFunction(resolver)) {
             // function resolver: call function and return result
             return await resolver(data, {
               ...baseAuthContext,
               typeName,
               fieldName: (path || 'root').split('.').pop(),
+              dataRoot,
             });
           } else {
             // unknown resolver type, default false.
@@ -197,7 +201,6 @@ export default (
         rootType,
         queryName,
       );
-      console.info(`input types: ${JSON.stringify(inputTypes)}`);
       const responseType = getResponseTypeForQuery(
         resolvedTypeDefs,
         rootType,
@@ -213,7 +216,7 @@ export default (
         const validateInputs = async (): Promise<AuthResult> =>
           mapPromiseValues(
             mapValues(inputs, (value, key) =>
-              authorizeType('write', inputTypes[key], value),
+              authorizeType('write', inputTypes[key], value, inputs),
             ),
           );
 
@@ -238,7 +241,7 @@ export default (
        * (mutations and queries)
        */
       const validateResponse = async (): Promise<AuthResult> =>
-        authorizeType('read', responseType, queryResponse);
+        authorizeType('read', responseType, queryResponse, queryResponse);
 
       const responseValidationResult = await validateResponse();
       console.info(

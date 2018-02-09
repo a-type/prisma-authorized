@@ -31,10 +31,13 @@
   },
   "homepage": "https://github.com/a-type/graphql-authorization#readme",
   "jest": {
-    "roots": ["src"]
+    "roots": [
+      "src"
+    ]
   },
   "dependencies": {
     "change-case": "^3.0.1",
+    "deepmerge": "^2.0.1",
     "graphql-tag": "^2.6.1",
     "lodash": "^4.17.5"
   },

@@ -3,6 +3,12 @@ import { get } from 'lodash';
 import { camel } from 'change-case';
 import { toFragment } from './utils';
 
+const mustDefineIdError = new Error(
+  'In order for this authorization check to work, you must include the id' +
+    ' for the resource in your query. If that is not possible, please opt to use' +
+    ' a custom authorization check for this permission.',
+);
+
 type IsMeOptions = { userIdPath: string };
 export const isMe = (
   options: IsMeOptions = { userIdPath: 'id' },
@@ -10,7 +16,11 @@ export const isMe = (
   const { userIdPath = 'id' } = options;
 
   return async (data: {}, ctx: AuthContext): Promise<boolean> => {
-    const id = get(data, userIdPath);
+    // a bit of a hack... perhaps another resolver would be a cleaner solution
+    const id = get(data, userIdPath, get(ctx.dataRoot, 'where.' + userIdPath));
+    if (!id) {
+      throw mustDefineIdError;
+    }
     return id === ctx.user.id;
   };
 };
@@ -37,11 +47,7 @@ export const isMine = (
     // fallback on query if info did not include relationship path
     const id = get(data, resourceIdPath);
     if (!id) {
-      throw new Error(
-        'In order for this authorization check to work, you must include the id' +
-          ' for the resource in your query. If that is not possible, please opt to use' +
-          ' a custom authorization check for this permission.',
-      );
+      throw mustDefineIdError;
     }
 
     const info = toFragment(relationshipPath);
