@@ -2,7 +2,7 @@ import { isMe, isMine } from './authResolvers';
 
 describe('auth resolvers', () => {
   describe('isMe', () => {
-    const ctx = { user: { id: 'foo' } };
+    const ctx = { user: { id: 'foo' }, typeName: 'User' };
 
     describe('default config', () => {
       const check = isMe();

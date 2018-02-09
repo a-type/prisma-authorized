@@ -24,6 +24,7 @@ type OtherThing {
 
 type query {
   user(where: UserWhereInput): User!
+  users: [User!]!
   thing(where: ThingWhereInput): Thing!
   otherThing(where: OtherThingWhereInput): OtherThing!
 }
@@ -68,9 +69,6 @@ const ROLES = {
   ANONYMOUS: 'ANONYMOUS',
   USER: 'USER',
 };
-
-console.log('isme:');
-console.log(isMe());
 
 const authMappings = {
   [ROLES.ANONYMOUS]: {
@@ -153,6 +151,7 @@ describe('withAuthorization', () => {
     mockPrisma = {
       query: {
         user: jest.fn(),
+        users: jest.fn(),
         thing: jest.fn(),
         otherThing: jest.fn(),
       },
@@ -165,7 +164,6 @@ describe('withAuthorization', () => {
       exists: jest.fn(),
       request: jest.fn(),
     };
-    console.log(roleAuthMapping(authMappings, 'USER'));
     prisma = withAuthorization(authMappings, typeDefs, mockPrisma)(user);
   });
 
@@ -177,6 +175,14 @@ describe('withAuthorization', () => {
         expect(
           await prisma.query.user({ where: { id: 'userA' } }, '{ id, name }'),
         ).toEqual(result);
+      });
+      test('can read list value types', async () => {
+        const result = [
+          { id: 'userA', name: 'User A' },
+          { id: 'userB', name: 'User B' },
+        ];
+        mockPrisma.query.users.mockReturnValueOnce(result);
+        expect(await prisma.query.users({}, '{ id, name }')).toEqual(result);
       });
       test('cannot read unallowed values', async () => {
         const result = { id: 'userA', name: 'User A', blah: 'foo' };

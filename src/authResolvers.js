@@ -11,11 +11,17 @@ const mustDefineIdError = new Error(
 
 type IsMeOptions = { userIdPath: string };
 export const isMe = (
-  options: IsMeOptions = { userIdPath: 'id' },
+  options: IsMeOptions = { userIdPath: 'id', userTypeName: 'User' },
 ): AuthResolver => {
-  const { userIdPath = 'id' } = options;
+  const { userIdPath = 'id', userTypeName = 'User' } = options;
 
-  return async (data: {}, ctx: AuthContext): Promise<boolean> => {
+  return async (data: {}, ctx: AuthContext): AuthResolverResult => {
+    if (ctx.typeName !== userTypeName) {
+      throw new Error(
+        `The isMe check should only be applied to a field or sub-field of a ${userTypeName} ` +
+          'type. ',
+      );
+    }
     // a bit of a hack... perhaps another resolver would be a cleaner solution
     const id = get(data, userIdPath, get(ctx.dataRoot, 'where.' + userIdPath));
     if (!id) {
@@ -38,7 +44,7 @@ export const isMine = (
 ): AuthResolver => {
   const { relationshipPath = 'user.id', resourceIdPath = 'id' } = options;
 
-  return async (data: {}, ctx: AuthContext): Promise<boolean> => {
+  return async (data: {}, ctx: AuthContext): AuthResolverResult => {
     const userId = get(data, relationshipPath);
     if (userId) {
       return userId === ctx.user.id;
