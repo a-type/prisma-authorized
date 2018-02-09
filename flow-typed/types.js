@@ -18,9 +18,9 @@ type Prisma = {
   request: () => mixed,
 };
 
-type AuthResolverValue = boolean | { [string]: AuthResolver };
+type AuthResolverValue = boolean | string;
 type AuthResolverResult = Promise<AuthResolverValue>;
-type AuthResolverFunction = (data: {}, ctx: AuthContext) => Promise<boolean>;
+type AuthResolverFunction = (data: {}, ctx: AuthContext) => AuthResolverResult;
 type AuthResolver =
   | boolean
   | string

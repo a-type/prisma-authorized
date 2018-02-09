@@ -1,5 +1,5 @@
 import withAuthorization from './withAuthorization';
-import { isMe, isMine } from './authResolvers';
+import { isMe, isMine } from './resolvers';
 import AuthorizationError from './errors/AuthorizationError';
 import roleAuthMapping from './roleAuthMapping';
 

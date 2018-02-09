@@ -140,7 +140,16 @@ export default (
           const resolver = getAuthResolver(authType, typeName, path);
 
           const authorizeLevelItem = async (item, itemPath) => {
-            if (isPlainObject(resolver)) {
+            const computedResolver = isFunction(resolver)
+              ? await resolver(data, {
+                  ...baseAuthContext,
+                  typeName,
+                  fieldName: (itemPath || 'root').split('.').pop(),
+                  dataRoot,
+                })
+              : resolver;
+
+            if (isPlainObject(computedResolver)) {
               // object resolver: traverse the next level of data
               // and apply child resolvers
               return mapPromiseValues(
@@ -149,21 +158,18 @@ export default (
                   return authorizeLevel(subData, subPath);
                 }),
               );
-            } else if (isBoolean(resolver)) {
+            } else if (isBoolean(computedResolver)) {
               // boolean resolver: return raw value
-              return resolver;
-            } else if (isString(resolver)) {
+              return computedResolver;
+            } else if (isString(computedResolver)) {
               // string resolver: authorize all sub-data as the type specified
               // in the string
-              return await authorizeType(authType, resolver, item, dataRoot);
-            } else if (isFunction(resolver)) {
-              // function resolver: call function and return result
-              return await resolver(data, {
-                ...baseAuthContext,
-                typeName,
-                fieldName: (itemPath || 'root').split('.').pop(),
+              return await authorizeType(
+                authType,
+                computedResolver,
+                item,
                 dataRoot,
-              });
+              );
             } else {
               // unknown resolver type, default false.
               return false;
