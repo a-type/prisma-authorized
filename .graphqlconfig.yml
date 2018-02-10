@@ -1,0 +1,5 @@
+projects:
+  database:
+    schemaPath: src/__fixtures__/prisma.graphql
+    extensions:
+      prisma: database/prisma.yml

@@ -1,0 +1,25 @@
+enum Role {
+  ROOT,
+  SUPER_USER,
+  USER,
+}
+
+type Thing {
+  id: ID! @unique
+  foo: Int!
+  user: User!
+  otherThing: OtherThing
+}
+
+type OtherThing {
+  id: ID! @unique
+  baz: String!
+  user: User!
+}
+
+type User {
+  id: ID! @unique
+  email: String! @unique
+  name: String!
+  role: Role!
+}

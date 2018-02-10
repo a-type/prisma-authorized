@@ -16,8 +16,9 @@ import {
   isArray,
 } from 'lodash';
 import AuthorizationError from './errors/AuthorizationError';
-import gql from 'graphql-tag';
 import { mapPromiseValues, joinPropertyPaths } from './utils';
+import getTypeName from './getTypeName';
+import resolveTypeDefs from './resolveTypeDefs';
 import Authorizer from './Authorizer';
 import type {
   AuthResult,
@@ -53,20 +54,6 @@ const getQueryField = (
   return get(root, 'fields', []).find(
     field => field.name.value === queryFieldName,
   );
-};
-
-const getTypeName = (typeNode: TypeNode): string => {
-  switch (typeNode.kind) {
-    case 'NamedType':
-      return typeNode.name.value;
-    case 'ListType':
-      return getTypeName(typeNode.type);
-    case 'NonNullType':
-      return getTypeName(typeNode.type);
-    /* istanbul ignore next */
-    default:
-      return 'Unknown';
-  }
 };
 
 const getInputTypesForQuery = (
@@ -109,20 +96,16 @@ export default (
   prisma: Prisma,
   options: WithAuthorizationOptions,
 ) => (user: User) => {
-  const resolvedTypeDefs: DocumentNode = isString(typeDefs)
-    ? gql`
-        ${typeDefs}
-      `
-    : typeDefs;
+  const resolvedTypeDefs: DocumentNode = resolveTypeDefs(typeDefs);
 
   const authorizer = new Authorizer(rootAuthMapping);
 
   const wrapQuery = (
     queryFunction: QueryFunction,
-    rootType: 'query' | 'mutation',
+    rootType: 'Query' | 'Mutation',
     queryName,
   ): WrappedQueryFunction => {
-    const isRead = rootType === 'query';
+    const isRead = rootType === 'Query';
 
     return async (inputs: ?QueryInputs, info: string, ctx: {}) => {
       const context: AuthContext = {
@@ -204,10 +187,10 @@ export default (
   };
 
   const query = mapValues(prisma.query, (fn, key) =>
-    wrapQuery(fn.bind(prisma), 'query', key),
+    wrapQuery(fn.bind(prisma), 'Query', key),
   );
   const mutation = mapValues(prisma.mutation, (fn, key) =>
-    wrapQuery(fn.bind(prisma), 'mutation', key),
+    wrapQuery(fn.bind(prisma), 'Mutation', key),
   );
 
   return {

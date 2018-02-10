@@ -1,68 +1,9 @@
 import withAuthorization from './withAuthorization';
 import { isMe, isMine } from './resolvers';
 import AuthorizationError from './errors/AuthorizationError';
+import path from 'path';
 
-const typeDefs = `
-type User {
-  id: String!
-  name: String!
-}
-
-type Thing {
-  id: String!
-  foo: Int!
-  user: User!
-  otherThing: OtherThing
-}
-
-type OtherThing {
-  id: String!
-  baz: String!
-  user: User!
-}
-
-type query {
-  user(where: UserWhereInput): User!
-  users: [User!]!
-  thing(where: ThingWhereInput): Thing!
-  otherThing(where: OtherThingWhereInput): OtherThing!
-}
-
-type mutation {
-  createUser(data: UserCreateInput): User!
-  updateUser(where: UserWhereInput, data: UserUpdateInput): User!
-  createThing(data: ThingCreateInput): Thing!
-  createOtherThing(data: OtherThingCreateInput): OtherThing!
-}
-
-input UserWhereInput {
-  id: String
-}
-
-input ThingWhereInput {
-  id: String
-}
-
-input OtherThingWhereInput {
-  id: String
-}
-
-input UserCreateInput {
-  name: String
-}
-
-input UserUpdateInput {
-  name: String
-}
-
-input ThingCreateInput {
-  foo: Int
-}
-
-input OtherThingCreateInput {
-  baz: String
-}
-`;
+const typeDefs = path.resolve(__dirname, './__fixtures__/prisma.graphql');
 
 const ROLES = {
   ANONYMOUS: 'ANONYMOUS',
@@ -111,7 +52,7 @@ const authMappings = {
       },
       UserCreateInput: { write: 'User' },
       UserUpdateInput: { write: 'User' },
-      UserWhereInput: { write: { id: true } },
+      UserWhereUniqueInput: { write: { id: true } },
 
       Thing: {
         read: {
