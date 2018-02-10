@@ -6,7 +6,10 @@
   "scripts": {
     "test": "jest",
     "precommit": "lint-staged",
-    "build": "babel src/ -d dist/",
+    "build:clean": "rimraf lib",
+    "build:lib": "babel src/ -d lib/ --ignore **/*.test.js",
+    "build:flow": "flow-copy-source -v -i **/*.test.js src lib",
+    "build": "run-s build:*",
     "prepublish": "npm run build",
     "flow": "flow"
   },
@@ -49,10 +52,13 @@
     "babel-preset-env": "^1.6.1",
     "babel-preset-flow": "^6.23.0",
     "flow-bin": "^0.64.0",
+    "flow-copy-source": "^1.3.0",
     "graphql": "^0.12.3",
     "husky": "^0.14.3",
     "jest": "^22.1.4",
     "lint-staged": "^6.1.0",
-    "prettier": "^1.10.2"
+    "npm-run-all": "^4.1.2",
+    "prettier": "^1.10.2",
+    "rimraf": "^2.6.2"
   }
 }

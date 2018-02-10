@@ -1,6 +1,11 @@
+// @flow
 import { merge } from 'lodash';
+import type { AuthMapping, AuthPermissions } from './types';
 
-const rolesAuthMapping = (authMapping, role) => {
+const rolePermissions = (
+  authMapping: AuthMapping,
+  role: string,
+): AuthPermissions => {
   if (!role) {
     return {};
   }
@@ -14,4 +19,4 @@ const rolesAuthMapping = (authMapping, role) => {
   return merge(...queue);
 };
 
-export default rolesAuthMapping;
+export default rolePermissions;

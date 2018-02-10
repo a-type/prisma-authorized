@@ -1,14 +1,20 @@
 //@flow
+import type {
+  AuthResolverFunction,
+  AuthResolverValue,
+  AuthContext,
+  AuthResolverResult,
+  AuthResolverFunctionParams,
+} from '../types';
 
 export default (
   targetType: string,
   condition: AuthResolverFunction,
   fallback?: AuthResolverValue = false,
 ): AuthResolverFunction => async (
-  data: {},
-  ctx: AuthContext,
+  params: AuthResolverFunctionParams,
 ): AuthResolverResult => {
-  if (await condition(data, ctx)) {
+  if (await condition(params)) {
     return targetType;
   }
   return fallback;

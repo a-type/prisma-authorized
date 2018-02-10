@@ -1,6 +1,11 @@
 import { camel } from 'change-case';
 import { get } from 'lodash';
 import { toFragment } from '../utils';
+import type {
+  AuthResolverFunction,
+  AuthResolverResult,
+  AuthResolverFunctionParams,
+} from '../types';
 
 type IsMineOptions = {
   relationshipPath: string,

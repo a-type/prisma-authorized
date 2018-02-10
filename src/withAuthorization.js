@@ -19,6 +19,17 @@ import AuthorizationError from './errors/AuthorizationError';
 import gql from 'graphql-tag';
 import { mapPromiseValues, joinPropertyPaths } from './utils';
 import Authorizer from './Authorizer';
+import type {
+  AuthResult,
+  AuthContext,
+  QueryInputs,
+  User,
+  QueryRootData,
+  QueryFunction,
+  WrappedQueryFunction,
+  Prisma,
+  WithAuthorizationOptions,
+} from './types';
 
 const summarizeAuthResult = (authResult: AuthResult) => {
   const traverse = (sum, level) => {

@@ -1,4 +1,10 @@
 import { get } from 'lodash';
+import type {
+  AuthResolverFunction,
+  AuthResolverFunctionParams,
+  AuthResolverValue,
+  AuthResolverResult,
+} from '../types';
 
 type IsMeOptions = { userIdPath: string };
 export default (
