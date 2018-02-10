@@ -1,3 +1,5 @@
+//@flow
+
 type User = {
   id: string,
   role: string,
@@ -6,9 +8,7 @@ type User = {
 type AuthContext = {
   user: User,
   prisma: Prisma,
-  typeName: string,
-  fieldName: string,
-  dataRoot: {},
+  graphqlContext: {},
 };
 
 type Prisma = {
@@ -18,9 +18,29 @@ type Prisma = {
   request: () => mixed,
 };
 
+type QueryRootData = {
+  rootFieldName: string,
+  rootTypeName: string,
+  inputs: { [string]: mixed },
+};
+
+type QueryInputs = {
+  [string]: mixed,
+};
+
 type AuthResolverValue = boolean | string;
 type AuthResolverResult = Promise<AuthResolverValue>;
-type AuthResolverFunction = (data: {}, ctx: AuthContext) => AuthResolverResult;
+type AuthResolverFunctionParams = {
+  fieldValue: mixed,
+  fieldName: ?string,
+  fieldPath: string,
+  typeValue: {},
+  typeName: string,
+  context: AuthContext,
+} & QueryRootData;
+type AuthResolverFunction = (
+  params: AuthResolverFunctionParams,
+) => AuthResolverResult;
 type AuthResolver =
   | boolean
   | string
@@ -34,11 +54,12 @@ type AuthResource = {
   write: { [string]: AuthResolver },
 };
 
+type AuthPermissions = {
+  [string]: AuthResource,
+};
 type RoleAuthMapping = {
   inherits: string,
-  permissions: {
-    [string]: AuthResource,
-  },
+  permissions: AuthPermissions,
 };
 
 type AuthMapping = {

@@ -5,7 +5,7 @@ import type {
   TypeNode,
   InputValueDefinitionNode,
 } from 'graphql';
-import { camel } from 'change-case';
+import { camel, pascal } from 'change-case';
 import {
   get,
   mapValues,
@@ -15,13 +15,10 @@ import {
   isFunction,
   isArray,
 } from 'lodash';
-import roleAuthMapping from './roleAuthMapping';
 import AuthorizationError from './errors/AuthorizationError';
 import gql from 'graphql-tag';
-import { mapPromiseValues } from './utils';
-
-const joinPropertyPaths = (...paths: Array<?string>): string =>
-  paths.filter(Boolean).join('.');
+import { mapPromiseValues, joinPropertyPaths } from './utils';
+import Authorizer from './Authorizer';
 
 const summarizeAuthResult = (authResult: AuthResult) => {
   const traverse = (sum, level) => {
@@ -55,6 +52,7 @@ const getTypeName = (typeNode: TypeNode): string => {
       return getTypeName(typeNode.type);
     case 'NonNullType':
       return getTypeName(typeNode.type);
+    /* istanbul ignore next */
     default:
       return 'Unknown';
   }
@@ -100,19 +98,13 @@ export default (
   prisma: Prisma,
   options: WithAuthorizationOptions,
 ) => (user: User) => {
-  const authMapping = roleAuthMapping(rootAuthMapping, user.role);
   const resolvedTypeDefs: DocumentNode = isString(typeDefs)
     ? gql`
         ${typeDefs}
       `
     : typeDefs;
 
-  const getAuthResolver = (
-    authType: AuthType,
-    typeName: string,
-    path?: string,
-  ): AuthResolver =>
-    get(authMapping, joinPropertyPaths(typeName, authType, path));
+  const authorizer = new Authorizer(rootAuthMapping);
 
   const wrapQuery = (
     queryFunction: QueryFunction,
@@ -121,71 +113,11 @@ export default (
   ): WrappedQueryFunction => {
     const isRead = rootType === 'query';
 
-    return async (inputs: {}, info: string, ctx: {}) => {
-      const baseAuthContext = {
+    return async (inputs: ?QueryInputs, info: string, ctx: {}) => {
+      const context: AuthContext = {
         user,
         graphqlContext: ctx,
-      };
-
-      const authorizeType = async (
-        authType: AuthType,
-        typeName: string,
-        data: {},
-        dataRoot: {},
-      ): Promise<AuthResult> => {
-        const authorizeLevel = async (
-          levelData: any,
-          path?: string,
-        ): Promise<AuthResult> => {
-          const resolver = getAuthResolver(authType, typeName, path);
-
-          const authorizeLevelItem = async (item, itemPath) => {
-            const computedResolver = isFunction(resolver)
-              ? await resolver(data, {
-                  ...baseAuthContext,
-                  typeName,
-                  fieldName: (itemPath || 'root').split('.').pop(),
-                  dataRoot,
-                })
-              : resolver;
-
-            if (isPlainObject(computedResolver)) {
-              // object resolver: traverse the next level of data
-              // and apply child resolvers
-              return mapPromiseValues(
-                mapValues(item, (subData, key) => {
-                  const subPath = joinPropertyPaths(itemPath, key);
-                  return authorizeLevel(subData, subPath);
-                }),
-              );
-            } else if (isBoolean(computedResolver)) {
-              // boolean resolver: return raw value
-              return computedResolver;
-            } else if (isString(computedResolver)) {
-              // string resolver: authorize all sub-data as the type specified
-              // in the string
-              return await authorizeType(
-                authType,
-                computedResolver,
-                item,
-                dataRoot,
-              );
-            } else {
-              // unknown resolver type, default false.
-              return false;
-            }
-          };
-
-          if (isArray(levelData)) {
-            return Promise.all(
-              levelData.map(item => authorizeLevelItem(item, path)),
-            );
-          } else {
-            return authorizeLevelItem(levelData, path);
-          }
-        };
-
-        return authorizeLevel(data);
+        prisma,
       };
 
       const inputTypes = getInputTypesForQuery(
@@ -199,6 +131,12 @@ export default (
         queryName,
       );
 
+      const rootData: QueryRootData = {
+        rootFieldName: queryName,
+        rootTypeName: pascal(rootType),
+        inputs,
+      };
+
       /**
        * PHASE 1: Validate inputs against `write` rules
        * (mutations only)
@@ -207,7 +145,13 @@ export default (
         const validateInputs = async (): Promise<AuthResult> =>
           mapPromiseValues(
             mapValues(inputs, (value, key) =>
-              authorizeType('write', inputTypes[key], value, inputs),
+              authorizer.authorize({
+                typeName: inputTypes[key],
+                authType: 'write',
+                data: value,
+                context,
+                rootData,
+              }),
             ),
           );
 
@@ -229,7 +173,13 @@ export default (
        * (mutations and queries)
        */
       const validateResponse = async (): Promise<AuthResult> =>
-        authorizeType('read', responseType, queryResponse, queryResponse);
+        authorizer.authorize({
+          typeName: responseType,
+          authType: 'read',
+          data: queryResponse,
+          context,
+          rootData,
+        });
 
       const responseValidationResult = await validateResponse();
       const isResponseValid = summarizeAuthResult(responseValidationResult);

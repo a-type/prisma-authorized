@@ -6,15 +6,37 @@ export default (
 ): AuthResolver => {
   const { userIdPath = 'id', userTypeName = 'User' } = options;
 
-  return async (data: {}, ctx: AuthContext): AuthResolverResult => {
-    if (ctx.typeName !== userTypeName) {
+  return async (params: AuthResolverFunctionParams): AuthResolverResult => {
+    const {
+      context,
+      typeValue,
+      typeName,
+      rootFieldName,
+      rootTypeName,
+      inputs,
+    } = params;
+
+    if (typeName !== userTypeName) {
       throw new Error(
         `The isMe check should only be applied to a field or sub-field of a ${userTypeName} ` +
-          'type. ',
+          'type.',
       );
     }
-    // a bit of a hack... perhaps another resolver would be a cleaner solution
-    const id = get(data, userIdPath, get(ctx.dataRoot, 'where.' + userIdPath));
+
+    // FIXME: this isn't an elegant solution. Is there a better way to tell if the user
+    // being updated or deleted is the authenticated user?
+    const findId = () => {
+      if (
+        [`update${userTypeName}`, `delete${userTypeName}`].includes(
+          rootFieldName,
+        )
+      ) {
+        return get(inputs.where, userIdPath);
+      }
+      return get(typeValue, userIdPath);
+    };
+
+    const id = findId();
     if (!id) {
       throw new Error(
         'In order for this authorization check to work, you must include the id' +
@@ -22,6 +44,6 @@ export default (
           ' a custom authorization check for this permission.',
       );
     }
-    return id === ctx.user.id;
+    return id === context.user.id;
   };
 };

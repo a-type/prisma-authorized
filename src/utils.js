@@ -18,3 +18,6 @@ export const toFragment = (path: string): string => {
     return `{ ${parts[0]} }`;
   }
 };
+
+export const joinPropertyPaths = (...paths: Array<?string>): string =>
+  paths.filter(Boolean).join('.');

@@ -1,5 +1,5 @@
-import roleAuthMapping from './roleAuthMapping';
-import { isMe } from './authResolvers';
+import rolePermissions from './rolePermissions';
+import { isMe } from './resolvers';
 
 describe('user auth mapping', () => {
   const authResolver = isMe();
@@ -36,7 +36,7 @@ describe('user auth mapping', () => {
   };
 
   test('merges auths for inheriting roles', () => {
-    const result = roleAuthMapping(authMappings, 'USER');
+    const result = rolePermissions(authMappings, 'USER');
     expect(result).toEqual({
       User: {
         read: {
@@ -49,5 +49,10 @@ describe('user auth mapping', () => {
         },
       },
     });
+  });
+
+  test('handles no role', () => {
+    const result = rolePermissions(authMappings);
+    expect(result).toEqual({});
   });
 });

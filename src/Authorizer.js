@@ -1,128 +1,135 @@
 //@flow
+import {
+  get,
+  memoize,
+  isArray,
+  isFunction,
+  isString,
+  isPlainObject,
+  isBoolean,
+  mapValues,
+} from 'lodash';
+import { joinPropertyPaths, mapPromiseValues } from './utils';
+import rolePermissions from './rolePermissions';
 
-class Authorizer {
+export default class Authorizer {
   authMapping: AuthMapping;
+  memoizedRolePermissions: (role: string) => AuthPermissions;
 
   constructor(authMapping: AuthMapping) {
     this.authMapping = authMapping;
+    this.memoizedRolePermissions = memoize(role =>
+      rolePermissions(authMapping, role),
+    );
   }
 
-  authorize = async ({
+  getAuthResolver = (
+    role: string,
     typeName: string,
     authType: AuthType,
-    data: {},
-    dataRoot: {},
-    baseAuthContext: { user: User, graphqlContext: {} },
-  }): Promise<AuthResult> => {
-    const authorizeLevel = async (
-      levelData: any,
-      path?: string,
-    ): Promise<AuthResult> => {
-      const resolver = getAuthResolver(authType, typeName, path);
-
-      const authorizeLevelItem = async (item, itemPath) => {
-        const computedResolver = isFunction(resolver)
-          ? await resolver(data, {
-              ...baseAuthContext,
-              typeName,
-              fieldName: (itemPath || 'root').split('.').pop(),
-              dataRoot,
-            })
-          : resolver;
-
-        if (isPlainObject(computedResolver)) {
-          // object resolver: traverse the next level of data
-          // and apply child resolvers
-          return mapPromiseValues(
-            mapValues(item, (subData, key) => {
-              const subPath = joinPropertyPaths(itemPath, key);
-              return authorizeLevel(subData, subPath);
-            }),
-          );
-        } else if (isBoolean(computedResolver)) {
-          // boolean resolver: return raw value
-          return computedResolver;
-        } else if (isString(computedResolver)) {
-          // string resolver: authorize all sub-data as the type specified
-          // in the string
-          return await authorizeType(
-            authType,
-            computedResolver,
-            item,
-            dataRoot,
-          );
-        } else {
-          // unknown resolver type, default false.
-          return false;
-        }
-      };
-
-      if (isArray(levelData)) {
-        return Promise.all(
-          levelData.map(item => authorizeLevelItem(item, path)),
-        );
-      } else {
-        return authorizeLevelItem(levelData, path);
-      }
-    };
-
-    return authorizeLevel(data);
+    fieldPath?: string,
+  ): ?AuthResolver => {
+    const rolePermissions = this.memoizedRolePermissions(role);
+    return get(
+      rolePermissions,
+      joinPropertyPaths(typeName, authType, fieldPath),
+    );
   };
-}
 
-export default async (
-  authMapping: AuthMapping,
-  typeName: string,
-  authType: AuthType,
-  path: string,
-  data: {},
-  dataRoot: {},
-  baseAuthContext: { user: User, graphqlContext: {} },
-): Promise<AuthResult> => {
-  const authorizeLevel = async (
-    levelData: any,
-    path?: string,
-  ): Promise<AuthResult> => {
-    const resolver = getAuthResolver(authType, typeName, path);
+  resolveValueAccess = async (data: {
+    typeName: string,
+    typeValue: {},
+    authType: AuthType,
+    fieldPath?: string,
+    fieldValue: mixed,
+    context: AuthContext,
+    rootData: QueryRootData,
+  }): Promise<AuthResult> => {
+    const {
+      typeName,
+      typeValue,
+      authType,
+      fieldValue,
+      context,
+      fieldPath,
+      rootData,
+    } = data;
+    const role = context.user.role;
+    const fieldName = fieldPath ? fieldPath.split('.').pop() : undefined;
 
-    const authorizeLevelItem = async (item, itemPath) => {
-      const computedResolver = isFunction(resolver)
-        ? await resolver(data, {
-            ...baseAuthContext,
-            typeName,
-            fieldName: (itemPath || 'root').split('.').pop(),
-            dataRoot,
-          })
-        : resolver;
-
-      if (isPlainObject(computedResolver)) {
-        // object resolver: traverse the next level of data
-        // and apply child resolvers
-        return mapPromiseValues(
-          mapValues(item, (subData, key) => {
-            const subPath = joinPropertyPaths(itemPath, key);
-            return authorizeLevel(subData, subPath);
+    if (isArray(fieldValue)) {
+      return Promise.all(
+        // do not change pathname
+        fieldValue.map(item =>
+          this.resolveValueAccess({
+            ...data,
+            fieldValue: item,
           }),
-        );
-      } else if (isBoolean(computedResolver)) {
-        // boolean resolver: return raw value
-        return computedResolver;
-      } else if (isString(computedResolver)) {
-        // string resolver: authorize all sub-data as the type specified
-        // in the string
-        return await authorizeType(authType, computedResolver, item, dataRoot);
-      } else {
-        // unknown resolver type, default false.
-        return false;
-      }
-    };
+        ),
+      );
+    }
 
-    if (isArray(levelData)) {
-      return Promise.all(levelData.map(item => authorizeLevelItem(item, path)));
+    const rawResolver = this.getAuthResolver(
+      role,
+      typeName,
+      authType,
+      fieldPath,
+    );
+    // pre-compute a function resolver and use its resulting value
+    const resolver = isFunction(rawResolver)
+      ? await rawResolver({
+          typeName,
+          typeValue,
+          fieldValue: fieldValue,
+          fieldName,
+          fieldPath,
+          ...rootData,
+          context,
+        })
+      : rawResolver;
+
+    if (isPlainObject(resolver)) {
+      return mapPromiseValues(
+        mapValues((fieldValue: {}), (subValue, key) => {
+          const subPath = joinPropertyPaths(fieldPath, key);
+          return this.resolveValueAccess({
+            ...data,
+            fieldPath: subPath,
+            fieldValue: subValue,
+          });
+        }),
+      );
+    } else if (isBoolean(resolver)) {
+      return resolver;
+    } else if (isString(resolver)) {
+      return await this.resolveValueAccess({
+        ...data,
+        typeName: resolver,
+        typeValue: fieldValue,
+      });
     } else {
-      return authorizeLevelItem(levelData, path);
+      // unknown resolver type
+      return false;
     }
   };
 
-  return authorizeLevel(data);
-};
+  authorize = async (info: {
+    typeName: string,
+    authType: AuthType,
+    data: {},
+    context: AuthContext,
+    rootData: QueryRootData,
+  }): Promise<AuthResult> => {
+    const { typeName, authType, data, context, rootData } = info;
+
+    return this.resolveValueAccess({
+      typeName,
+      typeValue: data,
+      authType,
+      fieldValue: data,
+      rootValue: data,
+      context,
+      rootData,
+    });
+  };
+}
