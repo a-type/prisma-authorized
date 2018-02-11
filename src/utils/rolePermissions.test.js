@@ -1,5 +1,5 @@
 import rolePermissions from './rolePermissions';
-import { isMe } from './resolvers';
+import { isMe } from '../resolvers';
 
 describe('user auth mapping', () => {
   const authResolver = isMe();

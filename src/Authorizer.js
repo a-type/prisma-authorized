@@ -10,8 +10,7 @@ import {
   mapValues,
   isUndefined,
 } from 'lodash';
-import { joinPropertyPaths, mapPromiseValues } from './utils';
-import rolePermissions from './rolePermissions';
+import { joinPropertyPaths, mapPromiseValues, rolePermissions } from './utils';
 import type {
   AuthMapping,
   AuthResolver,
@@ -71,86 +70,91 @@ export default class Authorizer {
       rootData,
       role,
     } = data;
-    const rolePermissions = get(
-      this.authMapping,
-      joinPropertyPaths(role, 'permissions'),
-      {},
-    );
-    const inheritedRole = this.getInheritedRole(role);
-    const fieldName = fieldPath ? fieldPath.split('.').pop() : undefined;
 
-    if (isArray(fieldValue)) {
-      return Promise.all(
-        // do not change pathname
-        fieldValue.map(item =>
-          this.resolveValueAccess({
-            ...data,
-            fieldValue: item,
-          }),
-        ),
+    const resolveTraversingRoleInheritance = async (currentRole: string) => {
+      const rolePermissions = get(
+        this.authMapping,
+        joinPropertyPaths(currentRole, 'permissions'),
+        {},
       );
-    }
+      const inheritedRole = this.getInheritedRole(currentRole);
+      const fieldName = fieldPath ? fieldPath.split('.').pop() : undefined;
 
-    const rawResolver = this.getPathResolver(
-      rolePermissions,
-      typeName,
-      authType,
-      fieldPath ? fieldPath.split('.') : [],
-    );
-    // pre-compute a function resolver and use its resulting value
-    const resolver = isFunction(rawResolver)
-      ? await rawResolver({
-          typeName,
-          typeValue,
-          fieldValue,
-          fieldName,
-          fieldPath,
-          ...rootData,
-          context,
-        })
-      : rawResolver;
-
-    const resolveValue = async () => {
-      if (isPlainObject(resolver)) {
-        if (isPlainObject(fieldValue)) {
-          return mapPromiseValues(
-            mapValues((fieldValue: {}), (subValue, key) => {
-              const subPath = joinPropertyPaths(fieldPath, key);
-              return this.resolveValueAccess({
-                ...data,
-                fieldPath: subPath,
-                fieldValue: subValue,
-              });
+      if (isArray(fieldValue)) {
+        return Promise.all(
+          // do not change pathname
+          fieldValue.map(item =>
+            this.resolveValueAccess({
+              ...data,
+              fieldValue: item,
             }),
-          );
-        } else {
-          throw new Error(
-            `An object permission map was provided for field ${fieldPath ||
-              '<root>'}` +
-              ` on type ${typeName}, but this field is a primitive type.`,
-          );
-        }
-      } else if (isBoolean(resolver)) {
-        return resolver;
-      } else if (isString(resolver)) {
-        return await this.resolveValueAccess({
-          ...data,
-          typeName: resolver,
-          typeValue: fieldValue,
-        });
-      } else {
-        // unknown resolver type
-        return null;
+          ),
+        );
       }
+
+      const rawResolver = this.getPathResolver(
+        rolePermissions,
+        typeName,
+        authType,
+        fieldPath ? fieldPath.split('.') : [],
+      );
+      // pre-compute a function resolver and use its resulting value
+      const resolver = isFunction(rawResolver)
+        ? await rawResolver({
+            typeName,
+            typeValue,
+            fieldValue,
+            fieldName,
+            fieldPath,
+            ...rootData,
+            context,
+          })
+        : rawResolver;
+
+      const resolveValue = async () => {
+        if (isPlainObject(resolver)) {
+          if (isPlainObject(fieldValue)) {
+            return mapPromiseValues(
+              mapValues((fieldValue: {}), (subValue, key) => {
+                const subPath = joinPropertyPaths(fieldPath, key);
+                return this.resolveValueAccess({
+                  ...data,
+                  fieldPath: subPath,
+                  fieldValue: subValue,
+                });
+              }),
+            );
+          } else {
+            throw new Error(
+              `An object permission map was provided for field ${fieldPath ||
+                '<root>'}` +
+                ` on type ${typeName}, but this field is a primitive type.`,
+            );
+          }
+        } else if (isBoolean(resolver)) {
+          return resolver;
+        } else if (isString(resolver)) {
+          return await this.resolveValueAccess({
+            ...data,
+            typeName: resolver,
+            typeValue: fieldValue,
+          });
+        } else {
+          // unknown resolver type
+          return null;
+        }
+      };
+
+      const value = await resolveValue();
+      if (value === null && inheritedRole) {
+        // for auth failure, fallback on inherited role if available
+        return await resolveTraversingRoleInheritance(inheritedRole);
+      }
+
+      return value === null ? false : value;
     };
 
-    const value = await resolveValue();
-    if (value === null && inheritedRole) {
-      // for auth failure, fallback on inherited role if available
-      return await this.resolveValueAccess({ ...data, role: inheritedRole });
-    }
-
-    return value === null ? false : value;
+    return await resolveTraversingRoleInheritance(role);
   };
 
   authorize = async (info: {

@@ -1,4 +1,6 @@
-import withAuthorization from './withAuthorization';
+import withAuthorization, {
+  GENERATED_BASE_PERMISSION_ROLE,
+} from './withAuthorization';
 import { isMe, isMine } from './resolvers';
 import AuthorizationError from './errors/AuthorizationError';
 import path from 'path';
@@ -12,6 +14,7 @@ const ROLES = {
 
 const authMappings = {
   [ROLES.ANONYMOUS]: {
+    inherits: GENERATED_BASE_PERMISSION_ROLE,
     permissions: {
       User: {
         read: {
@@ -50,9 +53,6 @@ const authMappings = {
           name: isMe(),
         },
       },
-      UserCreateInput: { write: 'User' },
-      UserUpdateInput: { write: 'User' },
-      UserWhereUniqueInput: { write: { id: true } },
 
       Thing: {
         read: {
@@ -63,7 +63,6 @@ const authMappings = {
           foo: true,
         },
       },
-      ThingCreateInput: { write: 'Thing' },
 
       OtherThing: {
         read: {
