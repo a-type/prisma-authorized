@@ -6,3 +6,12 @@ export { default as getModelTypeNames } from './getModelTypeNames';
 export { default as getTypeName } from './getTypeName';
 export { default as resolveTypeDefs } from './resolveTypeDefs';
 export { default as rolePermissions } from './rolePermissions';
+export {
+  default as applyDerivedTypePermissions,
+} from './applyDerivedTypePermissions';
+export { default as summarizeAuthResult } from './summarizeAuthResult';
+export {
+  default as annotateAuthResultWithInputTypes,
+} from './annotateAuthResultWithInputTypes';
+export { default as getQueryTypes } from './getQueryTypes';
+export { default as UserRoleWeakMap } from './UserRoleWeakMap';

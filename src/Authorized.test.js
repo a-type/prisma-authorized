@@ -1,6 +1,4 @@
-import withAuthorization, {
-  GENERATED_BASE_PERMISSION_ROLE,
-} from './withAuthorization';
+import Authorized from './Authorized';
 import { isMe, isMine } from './resolvers';
 import AuthorizationError from './errors/AuthorizationError';
 import path from 'path';
@@ -14,7 +12,7 @@ const ROLES = {
 
 const authMappings = {
   [ROLES.ANONYMOUS]: {
-    inherits: GENERATED_BASE_PERMISSION_ROLE,
+    inherits: Authorized.GENERATED_BASE_PERMISSION_ROLE,
     permissions: {
       User: {
         read: {
@@ -83,7 +81,7 @@ const user = {
 };
 
 describe('withAuthorization', () => {
-  let mockPrisma, prisma;
+  let mockPrisma, authorized, authorizedForUser;
 
   beforeAll(() => {
     mockPrisma = {
@@ -102,7 +100,14 @@ describe('withAuthorization', () => {
       exists: jest.fn(),
       request: jest.fn(),
     };
-    prisma = withAuthorization(authMappings, typeDefs, mockPrisma)(user);
+
+    authorized = new Authorized({
+      prisma: mockPrisma,
+      typeDefs,
+      permissionMap: authMappings,
+    });
+
+    authorizedForUser = authorized.forUser(user);
   });
 
   describe('simple (bool) mappings', () => {
@@ -112,7 +117,10 @@ describe('withAuthorization', () => {
         const result = { id: 'userA', name: 'User A' };
         mockPrisma.query.user.mockReturnValueOnce(result);
         await expect(
-          prisma.query.user({ where: { id: 'userA' } }, '{ id, name }'),
+          authorizedForUser.query.user(
+            { where: { id: 'userA' } },
+            '{ id, name }',
+          ),
         ).resolves.toEqual(result);
       });
       test('can read list value types', async () => {
@@ -122,16 +130,19 @@ describe('withAuthorization', () => {
           { id: 'userB', name: 'User B' },
         ];
         mockPrisma.query.users.mockReturnValueOnce(result);
-        await expect(await prisma.query.users({}, '{ id, name }')).toEqual(
-          result,
-        );
+        await expect(
+          await authorizedForUser.query.users({}, '{ id, name }'),
+        ).toEqual(result);
       });
       test('cannot read unallowed values', async () => {
         expect.assertions(1);
         const result = { id: 'userA', name: 'User A', blah: 'foo' };
         mockPrisma.query.user.mockReturnValueOnce(result);
         await expect(
-          prisma.query.user({ where: { id: 'userA' } }, '{ id, name, blah }'),
+          authorizedForUser.query.user(
+            { where: { id: 'userA' } },
+            '{ id, name, blah }',
+          ),
         ).rejects.toThrow('{"id":true,"name":true,"blah":false}');
       });
     });
@@ -143,7 +154,7 @@ describe('withAuthorization', () => {
         const input = { data: { foo: 'a' } };
         mockPrisma.mutation.createThing.mockReturnValueOnce(result);
         await expect(
-          prisma.mutation.createThing(input, '{ id, foo }'),
+          authorizedForUser.mutation.createThing(input, '{ id, foo }'),
         ).resolves.toEqual(result);
       });
 
@@ -151,7 +162,7 @@ describe('withAuthorization', () => {
         expect.assertions(1);
         const input = { data: { id: 'userB' } };
         await expect(
-          prisma.mutation.createUser(input, '{ id }'),
+          authorizedForUser.mutation.createUser(input, '{ id }'),
         ).rejects.toThrow('{"id":false}');
       });
     });
@@ -164,7 +175,10 @@ describe('withAuthorization', () => {
         const result = { id: 'userA', name: 'User A', email: 'user@place.com' };
         mockPrisma.query.user.mockReturnValueOnce(result);
         await expect(
-          prisma.query.user({ where: { id: 'userA' } }, '{ id, name, email }'),
+          authorizedForUser.query.user(
+            { where: { id: 'userA' } },
+            '{ id, name, email }',
+          ),
         ).resolves.toEqual(result);
       });
 
@@ -173,7 +187,10 @@ describe('withAuthorization', () => {
         const result = { id: 'userB', name: 'User B', email: 'user@place.com' };
         mockPrisma.query.user.mockReturnValueOnce(result);
         await expect(
-          prisma.query.user({ where: { id: 'userB' } }, '{ id, name, email }'),
+          authorizedForUser.query.user(
+            { where: { id: 'userB' } },
+            '{ id, name, email }',
+          ),
         ).rejects.toThrow('"email":false');
       });
     });
@@ -189,7 +206,7 @@ describe('withAuthorization', () => {
         const input = { data: { name: 'User AA' }, where: { id: 'userA' } };
         mockPrisma.mutation.updateUser.mockReturnValueOnce(result);
         await expect(
-          prisma.mutation.updateUser(input, '{ id, name, email }'),
+          authorizedForUser.mutation.updateUser(input, '{ id, name, email }'),
         ).resolves.toEqual(result);
       });
     });
