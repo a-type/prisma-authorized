@@ -1,13 +1,15 @@
 //@flow
 import type { DocumentNode } from 'graphql';
-import type { AuthPermissions } from './types';
+import { type RolePermissions, type PermissionResolver } from '../types';
 import { identity } from 'lodash';
 
 const open = () => true;
 
 // these functions will be called with the type name
 // to determine rules for access on associated types
-const delegatingTypeRules = {
+const delegatingTypeRules: {
+  [string]: (typeName: string) => PermissionResolver,
+} = {
   // metadata only
   Connection: open,
   Edge: open,
@@ -58,7 +60,7 @@ const delegatingTypeRules = {
   WhereUniqueInput: open,
 };
 
-export default (typeName: string): AuthPermissions =>
+export default (typeName: string): RolePermissions =>
   Object.keys(delegatingTypeRules).reduce((delegatingMap, typeSuffix) => {
     const rules = delegatingTypeRules[typeSuffix](typeName);
     return {

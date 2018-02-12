@@ -3,7 +3,6 @@ import {
   type PermissionMapProvider,
   type PermissionMap,
   type User,
-  type AuthType,
   type PermissionQueue,
   type PermissionMapProviderOptions,
   type RolePermissions,
@@ -18,7 +17,7 @@ export default class StaticPermissionMapProvider
 
   constructor(
     staticPermissionMap: PermissionMap,
-    options?: PermissionMapProviderOptions,
+    options?: PermissionMapProviderOptions = {},
   ) {
     const { generateDerivedPermissions = [] } = options;
 

@@ -1,19 +1,19 @@
 //@flow
-import type {
-  AuthResolverFunction,
-  AuthResolverValue,
-  AuthContext,
-  AuthResolverResult,
-  AuthResolverFunctionParams,
+import {
+  type PermissionResolverFunction,
+  type PermissionResolverValue,
+  type AuthContext,
+  type PermissionResolverResult,
+  type PermissionResolverFunctionParams,
 } from '../types';
 
 export default (
   targetType: string,
-  condition: AuthResolverFunction,
-  fallback?: AuthResolverValue = false,
-): AuthResolverFunction => async (
-  params: AuthResolverFunctionParams,
-): AuthResolverResult => {
+  condition: PermissionResolverFunction,
+  fallback?: PermissionResolverValue = false,
+): PermissionResolverFunction => async (
+  params: PermissionResolverFunctionParams,
+): PermissionResolverResult => {
   if (await condition(params)) {
     return targetType;
   }

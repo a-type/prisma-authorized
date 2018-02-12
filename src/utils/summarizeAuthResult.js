@@ -1,13 +1,13 @@
 //@flow
-import type { AuthResult } from '../types';
+import { type PermissionSummary } from '../types';
 import { isBoolean } from 'lodash';
 
-export default (authResult: AuthResult) => {
+export default (permissionSummary: PermissionSummary) => {
   const traverse = (sum, level) => {
     if (isBoolean(level)) {
       return sum && level;
     }
     return Object.values(level).reduce(traverse, sum);
   };
-  return traverse(true, authResult);
+  return traverse(true, permissionSummary);
 };

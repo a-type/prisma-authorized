@@ -1,18 +1,20 @@
 import { get } from 'lodash';
-import type {
-  AuthResolverFunction,
-  AuthResolverFunctionParams,
-  AuthResolverValue,
-  AuthResolverResult,
+import {
+  type PermissionResolverFunction,
+  type PermissionResolverFunctionParams,
+  type PermissionResolverValue,
+  type PermissionResolverResult,
 } from '../types';
 
 type IsMeOptions = { userIdPath: string };
 export default (
   options: IsMeOptions = { userIdPath: 'id', userTypeName: 'User' },
-): AuthResolver => {
+): PermissionResolver => {
   const { userIdPath = 'id', userTypeName = 'User' } = options;
 
-  return async (params: AuthResolverFunctionParams): AuthResolverResult => {
+  return async (
+    params: PermissionResolverFunctionParams,
+  ): PermissionResolverResult => {
     const {
       context,
       typeValue,

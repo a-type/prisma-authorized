@@ -1,10 +1,10 @@
 import { camel } from 'change-case';
 import { get } from 'lodash';
 import { toFragment } from '../utils';
-import type {
-  AuthResolverFunction,
-  AuthResolverResult,
-  AuthResolverFunctionParams,
+import {
+  type PermissionResolverFunction,
+  type PermissionResolverResult,
+  type PermissionResolverFunctionParams,
 } from '../types';
 
 type IsMineOptions = {
@@ -16,10 +16,12 @@ export default (
     relationshipPath: 'user.id',
     resourceIdPath: 'id',
   },
-): AuthResolver => {
+): PermissionResolver => {
   const { relationshipPath = 'user.id', resourceIdPath = 'id' } = options;
 
-  return async (params: AuthResolverFunctionParams): AuthResolverResult => {
+  return async (
+    params: PermissionResolverFunctionParams,
+  ): PermissionResolverResult => {
     const { typeValue, typeName, context, rootFieldName } = params;
 
     const userId = get(typeValue, relationshipPath);

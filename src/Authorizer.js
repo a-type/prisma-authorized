@@ -19,6 +19,7 @@ import {
   type AuthContext,
   type QueryRootData,
   type PermissionSummary,
+  type User,
 } from './types';
 
 export default class Authorizer {

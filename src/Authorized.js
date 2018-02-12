@@ -41,7 +41,6 @@ import {
   type QueryFunction,
   type WrappedQueryFunction,
   type Prisma,
-  type WithAuthorizationOptions,
   type PermissionMapProvider,
   type AuthorizedPrisma,
 } from './types';
@@ -61,19 +60,12 @@ export default class Authorized {
   typeDefs: DocumentNode;
   prisma: Prisma;
 
-  constructor(
-    constructorOptions: {
-      prisma: Prisma,
-      typeDefs: DocumentNode | string,
-      permissionMapProvider: PermissionMapProvider,
-    } = {},
-  ) {
-    const {
-      prisma,
-      typeDefs,
-      permissionMapProvider,
-      options = Authorized.DEFAULT_OPTIONS,
-    } = constructorOptions;
+  constructor(constructorOptions: {
+    prisma: Prisma,
+    typeDefs: DocumentNode | string,
+    permissionMapProvider: PermissionMapProvider,
+  }) {
+    const { prisma, typeDefs, permissionMapProvider } = constructorOptions;
     this.prisma = prisma;
     this.typeDefs = resolveTypeDefs(typeDefs);
     this.permissionMapProvider = permissionMapProvider;
@@ -119,7 +111,7 @@ export default class Authorized {
         const rootData: QueryRootData = {
           rootFieldName: queryName,
           rootTypeName: pascal(rootType),
-          inputs,
+          inputs: inputs || {},
         };
 
         /**
@@ -156,7 +148,7 @@ export default class Authorized {
         /**
          * PHASE 2: Run query and get result
          */
-        const queryResponse = await queryFunction(inputs, info);
+        const queryResponse = await queryFunction(inputs || {}, info);
 
         /**
          * PHASE 3: Validate response against `read` rules
