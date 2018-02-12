@@ -1,4 +1,4 @@
-//@flow
+// @flow
 import {
   get,
   memoize,
@@ -11,31 +11,34 @@ import {
   isUndefined,
 } from 'lodash';
 import { joinPropertyPaths, mapPromiseValues, rolePermissions } from './utils';
-import type {
-  AuthMapping,
-  AuthResolver,
-  AuthType,
-  AuthPermissions,
-  AuthContext,
-  QueryRootData,
-  AuthResult,
+import {
+  type PermissionMapProvider,
+  type PermissionResolver,
+  type AccessType,
+  type RolePermissions,
+  type AuthContext,
+  type QueryRootData,
+  type PermissionSummary,
 } from './types';
 
 export default class Authorizer {
-  authMapping: AuthMapping;
+  permissionProvider: PermissionMapProvider;
 
-  constructor(authMapping: AuthMapping) {
-    this.authMapping = authMapping;
+  constructor(permissionProvider: PermissionMapProvider) {
+    this.permissionProvider = permissionProvider;
   }
 
   getPathResolver = (
-    rolePermissions: AuthPermissions,
+    rolePermissions: RolePermissions,
     typeName: string,
-    authType: AuthType,
+    authType: AccessType,
     fieldPathParts: Array<string>,
-  ): ?AuthResolver => {
+  ): ?PermissionResolver => {
     const parts = [typeName, authType, ...fieldPathParts];
-    const traverse = (permissions: {}, parts: Array<string>): AuthResolver => {
+    const traverse = (
+      permissions: {},
+      parts: Array<string>,
+    ): PermissionResolver => {
       const [part, ...rest] = parts;
       const level = get(permissions, part);
       if (isPlainObject(level) && !!rest.length) {
@@ -47,19 +50,16 @@ export default class Authorizer {
     return traverse(rolePermissions, parts);
   };
 
-  getInheritedRole = (role: string): ?string =>
-    get(this.authMapping, joinPropertyPaths(role, 'inherits'));
-
   resolveValueAccess = async (data: {
     typeName: string,
     typeValue: {},
-    authType: AuthType,
+    authType: AccessType,
     fieldPath?: string,
     fieldValue: mixed,
     context: AuthContext,
     rootData: QueryRootData,
-    role: string,
-  }): Promise<AuthResult> => {
+    user: User,
+  }): Promise<PermissionSummary> => {
     const {
       typeName,
       typeValue,
@@ -68,16 +68,12 @@ export default class Authorizer {
       context,
       fieldPath,
       rootData,
-      role,
+      user,
     } = data;
 
-    const resolveTraversingRoleInheritance = async (currentRole: string) => {
-      const rolePermissions = get(
-        this.authMapping,
-        joinPropertyPaths(currentRole, 'permissions'),
-        {},
-      );
-      const inheritedRole = this.getInheritedRole(currentRole);
+    const permissions = this.permissionProvider.getUserPermissions(user);
+
+    for (let permission of permissions) {
       const fieldName = fieldPath ? fieldPath.split('.').pop() : undefined;
 
       if (isArray(fieldValue)) {
@@ -93,7 +89,7 @@ export default class Authorizer {
       }
 
       const rawResolver = this.getPathResolver(
-        rolePermissions,
+        permission,
         typeName,
         authType,
         fieldPath ? fieldPath.split('.') : [],
@@ -146,24 +142,26 @@ export default class Authorizer {
       };
 
       const value = await resolveValue();
-      if (value === null && inheritedRole) {
-        // for auth failure, fallback on inherited role if available
-        return await resolveTraversingRoleInheritance(inheritedRole);
+      if (value !== null) {
+        return value;
       }
 
-      return value === null ? false : value;
-    };
+      // if value is null, there was no explicit permission set for this field in this permission group.
+      // fall back to the next permission group, if available.
+    }
 
-    return await resolveTraversingRoleInheritance(role);
+    // after iterating through all provided permissions for the user, we did
+    // not find any rules matching this field. Default to block access.
+    return false;
   };
 
   authorize = async (info: {
     typeName: string,
-    authType: AuthType,
+    authType: AccessType,
     data: {},
     context: AuthContext,
     rootData: QueryRootData,
-  }): Promise<AuthResult> => {
+  }): Promise<PermissionSummary> => {
     const { typeName, authType, data, context, rootData } = info;
 
     return this.resolveValueAccess({
@@ -174,7 +172,7 @@ export default class Authorizer {
       rootValue: data,
       context,
       rootData,
-      role: get(context, 'user.role'),
+      user: get(context, 'user'),
     });
   };
 }

@@ -1,4 +1,5 @@
 import Authorized from './Authorized';
+import StaticPermissionMapProvider from './StaticPermissionMapProvider';
 import { isMe, isMine } from './resolvers';
 import AuthorizationError from './errors/AuthorizationError';
 import path from 'path';
@@ -104,7 +105,9 @@ describe('withAuthorization', () => {
     authorized = new Authorized({
       prisma: mockPrisma,
       typeDefs,
-      permissionMap: authMappings,
+      permissionMapProvider: new StaticPermissionMapProvider(authMappings, {
+        generateDerivedPermissions: ['User', 'Thing', 'OtherThing'],
+      }),
     });
 
     authorizedForUser = authorized.forUser(user);

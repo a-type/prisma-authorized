@@ -15,3 +15,4 @@ export {
 } from './annotateAuthResultWithInputTypes';
 export { default as getQueryTypes } from './getQueryTypes';
 export { default as UserRoleWeakMap } from './UserRoleWeakMap';
+export { default as userRoleMemoize } from './userRoleMemoize';
