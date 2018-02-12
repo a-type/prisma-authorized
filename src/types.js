@@ -18,6 +18,11 @@ export type Prisma = {
   request: () => mixed,
 };
 
+export type AuthorizedPrisma = {
+  query: {},
+  mutation: {},
+};
+
 export type QueryRootData = {
   rootFieldName: string,
   rootTypeName: string,

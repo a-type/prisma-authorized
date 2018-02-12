@@ -12,7 +12,6 @@ type IsMineOptions = {
   resourceIdPath: string,
 };
 export default (
-  getFieldName: string,
   options: IsMineOptions = {
     relationshipPath: 'user.id',
     resourceIdPath: 'id',
@@ -21,7 +20,7 @@ export default (
   const { relationshipPath = 'user.id', resourceIdPath = 'id' } = options;
 
   return async (params: AuthResolverFunctionParams): AuthResolverResult => {
-    const { typeValue, typeName, context } = params;
+    const { typeValue, typeName, context, rootFieldName } = params;
 
     const userId = get(typeValue, relationshipPath);
     if (userId) {
@@ -29,7 +28,17 @@ export default (
     }
 
     // fallback on query if info did not include relationship path
-    const id = get(typeValue, resourceIdPath);
+
+    // FIXME: this isn't an elegant solution. Is there a better way to determine the id
+    // of the provided resource?
+    const findId = () => {
+      if ([`update${typeName}`, `delete${typeName}`].includes(rootFieldName)) {
+        return get(inputs.where, resourceIdPath);
+      }
+      return get(typeValue, resourceIdPath);
+    };
+
+    const id = findId();
     if (!id) {
       throw new Error(
         'In order for this authorization check to work, you must include the id' +

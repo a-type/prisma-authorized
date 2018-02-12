@@ -13,7 +13,6 @@ const ROLES = {
 
 const authMappings = {
   [ROLES.ANONYMOUS]: {
-    inherits: Authorized.GENERATED_BASE_PERMISSION_ROLE,
     permissions: {
       User: {
         read: {
@@ -56,7 +55,7 @@ const authMappings = {
       Thing: {
         read: {
           foo: true,
-          bar: isMine('thing'),
+          bar: isMine(),
         },
         write: {
           foo: true,
@@ -66,10 +65,10 @@ const authMappings = {
       OtherThing: {
         read: {
           baz: true,
-          corge: isMine('otherThing'),
+          corge: isMine(),
         },
         write: {
-          baz: isMine('OtherThing'),
+          baz: isMine(),
         },
       },
     },
@@ -81,7 +80,7 @@ const user = {
   role: ROLES.USER,
 };
 
-describe('withAuthorization', () => {
+describe('Authorized', () => {
   let mockPrisma, authorized, authorizedForUser;
 
   beforeAll(() => {

@@ -11,7 +11,7 @@ describe('isMine resolver', () => {
         },
       },
     };
-    const check = isMine('thing');
+    const check = isMine();
     test('match', async () => {
       const data = { id: 'r', user: { id: 'foo' } };
       expect(await check({ typeValue: data, typeName: 'Thing', context })).toBe(
@@ -39,7 +39,7 @@ describe('isMine resolver', () => {
       typeName: 'Thing',
     };
     const data = { id: 'r1' };
-    const check = isMine('thing');
+    const check = isMine();
     test('match', async () => {
       thingQuery.mockReturnValueOnce(Promise.resolve({ user: { id: 'foo' } }));
       expect(await check({ typeValue: data, typeName: 'Thing', context })).toBe(
@@ -76,7 +76,7 @@ describe('isMine resolver', () => {
         },
       },
     };
-    const check = isMine('thing', {
+    const check = isMine({
       relationshipPath: 'thing.user.id',
       resourceIdPath: 'thing.id',
     });

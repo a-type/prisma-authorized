@@ -6,13 +6,15 @@ import {
   type AuthType,
   type PermissionQueue,
   type PermissionMapProviderOptions,
+  type RolePermissions,
 } from './types';
 import { get, memoize } from 'lodash';
-import { applyDerivedTypePermissions, userRoleMemoize } from './utils';
+import { delegateTypeResolvers, userRoleMemoize } from './utils';
 
 export default class StaticPermissionMapProvider
   implements PermissionMapProvider {
   permissionMap: PermissionMap;
+  basePermissions: RolePermissions;
 
   constructor(
     staticPermissionMap: PermissionMap,
@@ -20,9 +22,14 @@ export default class StaticPermissionMapProvider
   ) {
     const { generateDerivedPermissions = [] } = options;
 
-    this.permissionMap = applyDerivedTypePermissions(
-      generateDerivedPermissions,
-    )(staticPermissionMap);
+    this.permissionMap = staticPermissionMap;
+    this.basePermissions = generateDerivedPermissions.reduce(
+      (map, typeName) => ({
+        ...map,
+        ...delegateTypeResolvers(typeName),
+      }),
+      {},
+    );
   }
 
   getUserPermissions = userRoleMemoize((user: User): PermissionQueue => {
@@ -32,6 +39,7 @@ export default class StaticPermissionMapProvider
       permissions.push(get(this.permissionMap[role], 'permissions'));
       role = get(this.permissionMap[role], 'inherits');
     }
+    permissions.push(this.basePermissions);
     return permissions;
   });
 }
