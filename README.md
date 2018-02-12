@@ -15,7 +15,49 @@ An authorization wrapper for [`prisma-binding`](https://github.com/graphcool/pri
 Example:
 
 ```js
-const permissionMap = ;
+const permissionMap = {
+  ANONYMOUS: {
+    permissions: {
+      User: {
+        read: {
+          id: true,
+          name: true,
+        },
+        write: {},
+      },
+      Thing: {
+        read: {
+          id: true,
+          foo: true,
+          user: 'User',
+        },
+        write: {},
+      },
+    },
+  },
+  USER: {
+    inherits: 'ANONYMOUS',
+    permissions: {
+      User: {
+        read: {
+          email: isMe(),
+        },
+        write: {
+          name: isMe(),
+        },
+      },
+      Thing: {
+        read: {
+          foo: true,
+          bar: isMine('Thing'),
+        },
+        write: {
+          foo: true,
+        },
+      },
+    },
+  },
+};
 
 const prisma = /* create prisma-binding */
 const authorized = new Authorized({
