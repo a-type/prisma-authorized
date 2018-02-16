@@ -1,7 +1,7 @@
 {
-  "name": "graphql-authorization",
+  "name": "prisma-authorized",
   "version": "0.1.0",
-  "description": "graphql authorization layer",
+  "description": "prisma authorization 'outerware'",
   "main": "dist/index.js",
   "scripts": {
     "test": "jest",
